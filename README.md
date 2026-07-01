@@ -1,2 +1,2 @@
 # DriderX
-Android Split Patch System. Base APK links dynamically to separate libnative-lib.so inside DXs.
+Advanced iOS style Dark UI Ride App. APK links dynamically to separate libnative-lib.so inside DXs.
