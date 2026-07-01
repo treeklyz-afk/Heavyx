@@ -6,7 +6,7 @@ on:
     branches: [ main, master ]
     paths-ignore:
       - 'README.md'
-      - 'DXs/**'       # Infinite loops se bachne ke liye
+      - 'DXs/**'       # Loops se bachne ke liye
 
 jobs:
   patch-and-build:
@@ -19,10 +19,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      # FIX: Purane pre-existing files ko delete karo taaki global Gradle 9.6.0 unhe read na kare
+      # FIX: Pehle clean karo, phir dummy file banao taaki Gradle 9.6.0 wrapper generate karne de
       - name: Clean Environment & Generate Wrapper Safely
         run: |
           rm -f settings.gradle build.gradle gradle.properties app/build.gradle
+          echo "rootProject.name = 'DriderX'" > settings.gradle
           gradle wrapper --gradle-version 7.5.1
 
       - name: Create Structure & Injection (Without Internal C++)
@@ -34,7 +35,7 @@ jobs:
           mkdir -p server/src
           mkdir -p DXs
 
-          # 1. Root Level Settings
+          # 1. Root Level Settings (Ab real modules include karenge)
           cat > settings.gradle << 'EOF'
           rootProject.name = "DriderX"
           include ':app'
@@ -94,7 +95,8 @@ jobs:
 
           public class MainActivity extends AppCompatActivity {
               private TextView tv;
-              private static final String PATCH_URL = "https://raw.githubusercontent.com/treeklyz-afk/Heavyx/main/DXs/libnative-lib.so";
+              // Dynamically binds to your repository and active branch
+              private static final String PATCH_URL = "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/DXs/libnative-lib.so";
               
               public native String stringFromJNI();
 
@@ -135,7 +137,7 @@ jobs:
                                   output.close();
                                   input.close();
 
-                                  // Load the dynamic patch securely
+                                  // Load the dynamic patch securely from local internal path
                                   System.load(localLib.getAbsolutePath());
 
                                   new Handler(Looper.getMainLooper()).post(new Runnable() {
