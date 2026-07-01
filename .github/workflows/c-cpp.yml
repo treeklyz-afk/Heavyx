@@ -1,240 +1,76 @@
-name: DriderX – Full Build & Structure
+name: DriderX – Build & Deploy to DXs Folder
 
 on:
-  workflow_dispatch:   # manual trigger only
+  workflow_dispatch:   # Manual trigger karne ke liye
   push:
     branches: [ main, master ]
     paths-ignore:
       - 'README.md'
+      - 'DXs/**'       # CRITICAL: Isse push hone par infinite build loop nahi banega
 
 jobs:
-  create-structure:
+  build-android:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # Grant write access to commit project structure
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.head_commit && !contains(github.event.head_commit.message, '[skip ci]'))
+      contents: write   # Repo me DXs folder push karne ke liye write permission
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Check if structure already exists
-        id: check
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK & CMake
         run: |
-          if [ -f "app/build.gradle" ] && [ -f "native/CMakeLists.txt" ] && [ -f "server/CMakeLists.txt" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
+          sdkmanager "ndk;25.2.9519653" "cmake;3.22.1"
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK and Native Libs
+        run: ./gradlew assembleDebug
+
+      - name: Collect Artifacts into DXs Folder
+        run: |
+          # DXs folder create karein
+          mkdir -p DXs
+          
+          # 1. APK copy karein
+          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp app/build/outputs/apk/debug/app-debug.apk DXs/driderx-debug.apk
+            echo "✅ APK successfully copied to DXs/"
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "❌ APK not found!"
+            exit 1
           fi
+          
+          # 2. Saari compiled .so libraries dhoondh kar copy karein
+          echo "Searching for compiled native (.so) libraries..."
+          find app/build/intermediates/merged_native_libs/debug/out/lib/ -name "*.so" -exec cp {} DXs/ \; 2>/dev/null || true
+          
+          # Backup search agar paths diff ho
+          find app/build/intermediates/cmake/debug/obj/ -name "*.so" -exec cp -r {} DXs/ \; 2>/dev/null || true
 
-      - name: Create directories and files (if missing)
-        if: steps.check.outputs.exists == 'false'
-        run: |
-          # STEP 1: Pehle empty directories create karo taaki Gradle validation fail na ho
-          mkdir -p app/src/main/java/com/drix
-          mkdir -p app/src/main/res/layout
-          mkdir -p app/src/main/res/values
-          mkdir -p native/src/main/cpp
-          mkdir -p server/src
+          # Verify folder contents
+          echo "Current DXs Folder Contents:"
+          ls -la DXs/
 
-          # STEP 2: Basic settings file fill karo jisse wrapper identify ho sake
-          cat > settings.gradle << 'EOF'
-          rootProject.name = "DriderX"
-          include ':app'
-          EOF
-
-          # STEP 3: Safe Wrapper Generation (Ab na toh module folder missing hai, na hi parsing crash hogi)
-          gradle wrapper --gradle-version 7.5.1
-
-          # STEP 4: Baaki bache saare source aur config files likho
-          # app/build.gradle
-          cat > app/build.gradle << 'EOF'
-          apply plugin: 'com.android.application'
-          android {
-              namespace "com.drix"
-              compileSdk 33
-              defaultConfig {
-                  applicationId "com.drix"
-                  minSdk 21
-                  targetSdk 33
-                  versionCode 1
-                  versionName "1.0"
-                  externalNativeBuild {
-                      cmake {
-                          cppFlags "-std=c++17"
-                      }
-                  }
-              }
-              externalNativeBuild {
-                  cmake {
-                      path "../native/CMakeLists.txt"
-                  }
-              }
-          }
-          dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-          }
-          EOF
-
-          # AndroidManifest.xml
-          cat > app/src/main/AndroidManifest.xml << 'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.drix">
-              <application android:label="DriderX">
-                  <activity android:name=".MainActivity" android:exported="true">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          EOF
-
-          # MainActivity.java
-          cat > app/src/main/java/com/drix/MainActivity.java << 'EOF'
-          package com.drix;
-          import androidx.appcompat.app.AppCompatActivity;
-          import android.os.Bundle;
-          import android.widget.TextView;
-          public class MainActivity extends AppCompatActivity {
-              static {
-                  System.loadLibrary("native-lib");
-              }
-              public native String stringFromJNI();
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_main);
-                  TextView tv = findViewById(R.id.sample_text);
-                  tv.setText(stringFromJNI());
-              }
-          }
-          EOF
-
-          # activity_main.xml
-          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:orientation="vertical">
-              <TextView android:id="@+id/sample_text"
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Hello from C++!" />
-          </LinearLayout>
-          EOF
-
-          # strings.xml
-          cat > app/src/main/res/values/strings.xml << 'EOF'
-          <resources>
-              <string name="app_name">DriderX</string>
-          </resources>
-          EOF
-
-          # native/CMakeLists.txt
-          cat > native/CMakeLists.txt << 'EOF'
-          cmake_minimum_required(VERSION 3.18)
-          project("native-lib")
-          add_library(native-lib SHARED src/main/cpp/native-lib.cpp)
-          target_include_directories(native-lib PRIVATE src/main/cpp)
-          find_library(log-lib log)
-          target_link_libraries(native-lib ${log-lib})
-          EOF
-
-          # native/src/main/cpp/native-lib.cpp
-          cat > native/src/main/cpp/native-lib.cpp << 'EOF'
-          #include <jni.h>
-          #include <string>
-          extern "C" JNIEXPORT jstring JNICALL
-          Java_com_drix_MainActivity_stringFromJNI(JNIEnv* env, jobject thiz) {
-              return env->NewStringUTF("Hello from DriderX Native!");
-          }
-          EOF
-
-          # server/CMakeLists.txt
-          cat > server/CMakeLists.txt << 'EOF'
-          cmake_minimum_required(VERSION 3.10)
-          project(DriderXServer)
-          set(CMAKE_CXX_STANDARD 17)
-          add_executable(driderx_server src/main.cpp)
-          target_link_libraries(driderx_server pthread)
-          EOF
-
-          # server/src/main.cpp
-          cat > server/src/main.cpp << 'EOF'
-          #include <iostream>
-          #include <cstring>
-          #include <sys/socket.h>
-          #include <netinet/in.h>
-          #include <unistd.h>
-          int main() {
-              int server_fd, new_socket;
-              struct sockaddr_in address;
-              int opt = 1;
-              int addrlen = sizeof(address);
-              char buffer[1024] = {0};
-              const char* hello = "Hello from DriderX Server!";
-              server_fd = socket(AF_INET, SOCK_STREAM, 0);
-              setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-              address.sin_family = AF_INET;
-              address.sin_addr.s_addr = INADDR_ANY;
-              address.sin_port = htons(8080);
-              bind(server_fd, (struct sockaddr*)&address, sizeof(address));
-              listen(server_fd, 3);
-              std::cout << "Server listening on port 8080" << std::endl;
-              while (true) {
-                  new_socket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen);
-                  read(new_socket, buffer, 1024);
-                  std::cout << "Received: " << buffer << std::endl;
-                  send(new_socket, hello, strlen(hello), 0);
-                  close(new_socket);
-              }
-              return 0;
-          }
-          EOF
-
-          # Top‑level build.gradle
-          cat > build.gradle << 'EOF'
-          buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:7.4.0'
-              }
-          }
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          EOF
-
-          cat > gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx2048m
-          android.useAndroidX=true
-          EOF
-
-          cat > README.md << 'EOF'
-          # DriderX
-          Android app with C++ native library and standalone C++ server.
-          - Package: com.drix
-          - Native library: native-lib
-          - Server: C++ echo server on port 8080
-          EOF
-
-      - name: Commit and push structure (if any new files)
-        if: steps.check.outputs.exists == 'false'
+      - name: Commit and Push Binaries to DXs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "Add initial DriderX project structure [skip ci]" || echo "No changes to commit"
+          
+          # Sirf DXs folder ko stage karein
+          git add DXs/
+          
+          # Commit aur push safely with [skip ci]
+          git commit -m "Automated Build: Updated APK and Native Libs in DXs [skip ci]" || echo "No changes to commit"
           git push origin HEAD:${{ github.ref_name }}
