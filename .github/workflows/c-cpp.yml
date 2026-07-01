@@ -33,10 +33,39 @@ jobs:
       - name: Create directories and files (if missing)
         if: steps.check.outputs.exists == 'false'
         run: |
-          # FIX: Generate the wrapper FIRST while the workspace configuration is clean
+          # STEP 1: Write root-level files FIRST so Gradle recognizes the project
+          cat > settings.gradle << 'EOF'
+          rootProject.name = "DriderX"
+          include ':app'
+          EOF
+
+          cat > build.gradle << 'EOF'
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:7.4.0'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          EOF
+
+          cat > gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx2048m
+          android.useAndroidX=true
+          EOF
+
+          # STEP 2: Generate the wrapper safely using the clean root setup
           gradle wrapper --gradle-version 7.5.1
 
-          # Now create the directory structures safely
+          # STEP 3: Now generate the rest of the directories and sub-project files
           mkdir -p app/src/main/java/com/drix
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
@@ -189,35 +218,6 @@ jobs:
               }
               return 0;
           }
-          EOF
-
-          # Top‑level Gradle files
-          cat > build.gradle << 'EOF'
-          buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:7.4.0'
-              }
-          }
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          EOF
-
-          cat > settings.gradle << 'EOF'
-          rootProject.name = "DriderX"
-          include ':app'
-          EOF
-
-          cat > gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx2048m
-          android.useAndroidX=true
           EOF
 
           cat > README.md << 'EOF'
