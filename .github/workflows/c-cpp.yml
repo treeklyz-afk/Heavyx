@@ -6,7 +6,7 @@ on:
     branches: [ main, master ]
     paths-ignore:
       - 'README.md'
-      - 'DXs/**'       # Loops se bachne ke liye
+      - 'DXs/**'       # Infinite build loops se bachne ke liye
 
 jobs:
   patch-and-build:
@@ -19,20 +19,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      # FIX 1: Clean and safe wrapper generation
+      # Clean pre-existing workspace configs for safe initialization
       - name: Clean Environment & Generate Wrapper Safely
         run: |
           rm -f settings.gradle build.gradle gradle.properties app/build.gradle
           echo "rootProject.name = 'DriderX'" > settings.gradle
           gradle wrapper --gradle-version 7.5.1
 
-      - name: Create Structure & Injection (With Crash Fixes)
+      - name: Create Necessary Project Structure Only
         run: |
+          # Only creating required directories for App and Native Patch
           mkdir -p app/src/main/java/com/drix
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p native/src/main/cpp
-          mkdir -p server/src
           mkdir -p DXs
 
           # 1. Root Level Settings
@@ -41,7 +41,7 @@ jobs:
           include ':app'
           EOF
 
-          # 2. Modify app/build.gradle (Target SDK 28 for direct storage loading)
+          # 2. App Build Configuration (Target SDK 28 for dynamic storage execution)
           cat > app/build.gradle << 'EOF'
           apply plugin: 'com.android.application'
           android {
@@ -60,7 +60,7 @@ jobs:
           }
           EOF
 
-          # FIX 2: Create themes.xml to prevent AppCompat instant crash
+          # 3. Themes Configuration (To prevent immediate launch crashes)
           cat > app/src/main/res/values/themes.xml << 'EOF'
           <resources>
               <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
@@ -71,17 +71,16 @@ jobs:
           </resources>
           EOF
 
-          # 3. AndroidManifest.xml (Applied AppTheme & Permissions)
+          # 4. Clean AndroidManifest.xml (Removed deprecated package attribute)
           cat > app/src/main/AndroidManifest.xml << 'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.drix">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
               
               <application 
                   android:label="DriderX"
                   android:theme="@style/AppTheme">
-                  <activity android:name=".MainActivity" android:exported="true">
+                  <activity android:name="com.drix.MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -91,7 +90,7 @@ jobs:
           </manifest>
           EOF
 
-          # FIX 3: MainActivity.java (Replaced Exception with Throwable to block hard crashes)
+          # 5. MainActivity.java (Runtime Dynamic Native Downloader Engine)
           cat > app/src/main/java/com/drix/MainActivity.java << 'EOF'
           package com.drix;
           import androidx.appcompat.app.AppCompatActivity;
@@ -149,7 +148,7 @@ jobs:
                                   output.close();
                                   input.close();
 
-                                  // Crucial Loader Fix: Checked execution viability
+                                  // Load the dynamic patch safely into internal data context
                                   System.load(localLib.getAbsolutePath());
 
                                   new Handler(Looper.getMainLooper()).post(new Runnable() {
@@ -184,11 +183,11 @@ jobs:
           }
           EOF
 
-          # 4. Resource layout file
+          # 6. FIXED layout file (Changed match_match to match_parent)
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_match"
+              android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:gravity="center"
               android:orientation="vertical">
@@ -207,7 +206,7 @@ jobs:
           </resources>
           EOF
 
-          # 5. Native Code Boilerplate
+          # 7. Native CMake & Source Configs
           cat > native/CMakeLists.txt << 'EOF'
           cmake_minimum_required(VERSION 3.18)
           project("native-lib")
@@ -225,20 +224,7 @@ jobs:
           }
           EOF
 
-          # 6. Server Source
-          cat > server/CMakeLists.txt << 'EOF'
-          cmake_minimum_required(VERSION 3.10)
-          project(DriderXServer)
-          add_executable(driderx_server src/main.cpp)
-          target_link_libraries(driderx_server pthread)
-          EOF
-
-          cat > server/src/main.cpp << 'EOF'
-          #include <iostream>
-          int main() { return 0; }
-          EOF
-
-          # 7. Main Configs
+          # 8. Gradle Core Properties
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral(); }
@@ -250,6 +236,11 @@ jobs:
           cat > gradle.properties << 'EOF'
           org.gradle.jvmargs=-Xmx2048m
           android.useAndroidX=true
+          EOF
+
+          cat > README.md << 'EOF'
+          # DriderX
+          Android Split Patch System. Base APK links dynamically to separate libnative-lib.so inside DXs.
           EOF
 
       - name: Set up JDK 17
@@ -264,7 +255,7 @@ jobs:
       - name: Install NDK Components
         run: sdkmanager "ndk;25.2.9519653" "cmake;3.22.1"
 
-      - name: Compile Library Independently (Separate Output)
+      - name: Compile Library Independently (Standalone Compilation)
         run: |
           mkdir -p native/build
           cd native/build
@@ -274,19 +265,24 @@ jobs:
                 ..
           make -j$(nproc)
           cp libnative-lib.so ../../DXs/
-          echo "✅ Native binary compiled separately inside DXs folder"
+          echo "✅ Isolated Native `.so` compiled successfully into DXs/"
 
-      - name: Compile Pure APK (No Native Code Embedded)
+      - name: Compile Pure Base APK
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
           cp app/build/outputs/apk/debug/app-debug.apk DXs/driderx-base.apk
-          echo "✅ Pure Base APK added to DXs folder"
+          echo "✅ Clean Base APK compiled and staged inside DXs/"
 
-      - name: Deploy Isolated Binaries to DXs Folder
+      - name: Clean Unused Workspace Bloat before Push
+        run: |
+          # Keep only your core tracking folders and clean temporary build items
+          rm -rf native/build app/build .gradle build
+
+      - name: Deploy Isolated Binaries directly to DXs Folder
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Refresh architecture: Fix theme and throwable loader [skip ci]" || echo "No changes"
+          git commit -m "Deploy production ready isolated binaries to DXs [skip ci]" || echo "No changes"
           git push origin HEAD:${{ github.ref_name }}
