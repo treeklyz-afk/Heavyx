@@ -33,45 +33,23 @@ jobs:
       - name: Create directories and files (if missing)
         if: steps.check.outputs.exists == 'false'
         run: |
-          # STEP 1: Write root-level files FIRST so Gradle recognizes the project
-          cat > settings.gradle << 'EOF'
-          rootProject.name = "DriderX"
-          include ':app'
-          EOF
-
-          cat > build.gradle << 'EOF'
-          buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:7.4.0'
-              }
-          }
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          EOF
-
-          cat > gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx2048m
-          android.useAndroidX=true
-          EOF
-
-          # STEP 2: Generate the wrapper safely using the clean root setup
-          gradle wrapper --gradle-version 7.5.1
-
-          # STEP 3: Now generate the rest of the directories and sub-project files
+          # STEP 1: Pehle empty directories create karo taaki Gradle validation fail na ho
           mkdir -p app/src/main/java/com/drix
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p native/src/main/cpp
           mkdir -p server/src
 
+          # STEP 2: Basic settings file fill karo jisse wrapper identify ho sake
+          cat > settings.gradle << 'EOF'
+          rootProject.name = "DriderX"
+          include ':app'
+          EOF
+
+          # STEP 3: Safe Wrapper Generation (Ab na toh module folder missing hai, na hi parsing crash hogi)
+          gradle wrapper --gradle-version 7.5.1
+
+          # STEP 4: Baaki bache saare source aur config files likho
           # app/build.gradle
           cat > app/build.gradle << 'EOF'
           apply plugin: 'com.android.application'
@@ -220,6 +198,30 @@ jobs:
           }
           EOF
 
+          # Top‑level build.gradle
+          cat > build.gradle << 'EOF'
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:7.4.0'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          EOF
+
+          cat > gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx2048m
+          android.useAndroidX=true
+          EOF
+
           cat > README.md << 'EOF'
           # DriderX
           Android app with C++ native library and standalone C++ server.
@@ -236,64 +238,3 @@ jobs:
           git add .
           git commit -m "Add initial DriderX project structure [skip ci]" || echo "No changes to commit"
           git push origin HEAD:${{ github.ref_name }}
-
-  build-android:
-    needs: create-structure
-    runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.head_commit && !contains(github.event.head_commit.message, '[skip ci]'))
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install NDK & CMake
-        run: |
-          sdkmanager "ndk;25.2.9519653" "cmake;3.22.1"
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-
-  build-server:
-    needs: create-structure
-    runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.head_commit && !contains(github.event.head_commit.message, '[skip ci]'))
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y cmake g++
-
-      - name: Configure and build server
-        run: |
-          mkdir -p server/build
-          cd server/build
-          cmake ..
-          make -j$(nproc)
-
-      - name: Upload server binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: driderx-server-binary
-          path: server/build/driderx_server
