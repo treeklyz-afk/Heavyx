@@ -1,19 +1,42 @@
-name: Create Project Structure
+name: DriderX – Full Build & Structure
 
 on:
-  workflow_dispatch:   # manual trigger only
+  # Manual trigger – ise click karo sab kuch ho jayega
+  workflow_dispatch:
+  # Push par bhi chalega, lekin [skip ci] wale commit ko ignore karega
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - 'README.md'
 
 jobs:
-  build-structure:
+  # ======================================================
+  #  JOB 1 : Structure Creation + Push (only if files missing)
+  # ======================================================
+  create-structure:
     runs-on: ubuntu-latest
+    # Sirf manual trigger par ya agar files nahi hain toh chalega
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      !(github.event.head_commit.message contains '[skip ci]')
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          persist-credentials: false   # needed for later push
+          persist-credentials: false
           fetch-depth: 0
 
-      - name: Create directories
+      - name: Check if structure already exists
+        id: check
+        run: |
+          if [ -f "app/build.gradle" ] && [ -f "native/CMakeLists.txt" ] && [ -f "server/CMakeLists.txt" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create directories and files (if missing)
+        if: steps.check.outputs.exists == 'false'
         run: |
           mkdir -p app/src/main/java/com/drix
           mkdir -p app/src/main/res/layout
@@ -21,8 +44,6 @@ jobs:
           mkdir -p native/src/main/cpp
           mkdir -p server/src
 
-      - name: Write Android app files
-        run: |
           # app/build.gradle
           cat > app/build.gradle << 'EOF'
           apply plugin: 'com.android.application'
@@ -108,8 +129,6 @@ jobs:
           </resources>
           EOF
 
-      - name: Write native C++ library files
-        run: |
           # native/CMakeLists.txt
           cat > native/CMakeLists.txt << 'EOF'
           cmake_minimum_required(VERSION 3.18)
@@ -130,8 +149,6 @@ jobs:
           }
           EOF
 
-      - name: Write C++ server files
-        run: |
           # server/CMakeLists.txt
           cat > server/CMakeLists.txt << 'EOF'
           cmake_minimum_required(VERSION 3.10)
@@ -174,8 +191,7 @@ jobs:
           }
           EOF
 
-      - name: Write top‑level Gradle files and README
-        run: |
+          # Top‑level Gradle files
           cat > build.gradle << 'EOF'
           buildscript {
               repositories {
@@ -212,10 +228,79 @@ jobs:
           - Server: C++ echo server on port 8080
           EOF
 
-      - name: Commit and push all new files
+      - name: Commit and push structure (if any new files)
+        if: steps.check.outputs.exists == 'false'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Add initial project structure for DriderX" || echo "No changes to commit"
+          git commit -m "Add initial DriderX project structure [skip ci]" || echo "No changes to commit"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
+
+  # ======================================================
+  #  JOB 2 : Build Android APK (with NDK)
+  # ======================================================
+  build-android:
+    needs: create-structure   # structure create hone ke baad hi chalega
+    runs-on: ubuntu-latest
+    # Agar push par trigger hua aur commit me [skip ci] hai toh skip karo
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      !(github.event.head_commit.message contains '[skip ci]')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK & CMake
+        run: |
+          sdkmanager "ndk;25.2.9519653" "cmake;3.22.1"
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+  # ======================================================
+  #  JOB 3 : Build C++ Server
+  # ======================================================
+  build-server:
+    needs: create-structure
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      !(github.event.head_commit.message contains '[skip ci]')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake g++
+
+      - name: Configure and build server
+        run: |
+          mkdir -p server/build
+          cd server/build
+          cmake ..
+          make -j$(nproc)
+
+      - name: Upload server binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: driderx-server-binary
+          path: server/build/driderx_server
