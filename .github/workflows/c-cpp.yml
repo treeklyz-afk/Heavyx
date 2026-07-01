@@ -1,0 +1,221 @@
+name: Create Project Structure
+
+on:
+  workflow_dispatch:   # manual trigger only
+
+jobs:
+  build-structure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # needed for later push
+          fetch-depth: 0
+
+      - name: Create directories
+        run: |
+          mkdir -p app/src/main/java/com/drix
+          mkdir -p app/src/main/res/layout
+          mkdir -p app/src/main/res/values
+          mkdir -p native/src/main/cpp
+          mkdir -p server/src
+
+      - name: Write Android app files
+        run: |
+          # app/build.gradle
+          cat > app/build.gradle << 'EOF'
+          apply plugin: 'com.android.application'
+          android {
+              compileSdk 33
+              defaultConfig {
+                  applicationId "com.drix"
+                  minSdk 21
+                  targetSdk 33
+                  versionCode 1
+                  versionName "1.0"
+                  externalNativeBuild {
+                      cmake {
+                          cppFlags "-std=c++17"
+                      }
+                  }
+              }
+              externalNativeBuild {
+                  cmake {
+                      path "native/CMakeLists.txt"
+                  }
+              }
+          }
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+          }
+          EOF
+
+          # AndroidManifest.xml
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.drix">
+              <application android:label="DriderX">
+                  <activity android:name=".MainActivity">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          # MainActivity.java
+          cat > app/src/main/java/com/drix/MainActivity.java << 'EOF'
+          package com.drix;
+          import androidx.appcompat.app.AppCompatActivity;
+          import android.os.Bundle;
+          import android.widget.TextView;
+          public class MainActivity extends AppCompatActivity {
+              static {
+                  System.loadLibrary("native-lib");
+              }
+              public native String stringFromJNI();
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_main);
+                  TextView tv = findViewById(R.id.sample_text);
+                  tv.setText(stringFromJNI());
+              }
+          }
+          EOF
+
+          # activity_main.xml
+          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical">
+              <TextView android:id="@+id/sample_text"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Hello from C++!" />
+          </LinearLayout>
+          EOF
+
+          # strings.xml
+          cat > app/src/main/res/values/strings.xml << 'EOF'
+          <resources>
+              <string name="app_name">DriderX</string>
+          </resources>
+          EOF
+
+      - name: Write native C++ library files
+        run: |
+          # native/CMakeLists.txt
+          cat > native/CMakeLists.txt << 'EOF'
+          cmake_minimum_required(VERSION 3.18)
+          project("native-lib")
+          add_library(native-lib SHARED src/main/cpp/native-lib.cpp)
+          target_include_directories(native-lib PRIVATE src/main/cpp)
+          find_library(log-lib log)
+          target_link_libraries(native-lib ${log-lib})
+          EOF
+
+          # native/src/main/cpp/native-lib.cpp
+          cat > native/src/main/cpp/native-lib.cpp << 'EOF'
+          #include <jni.h>
+          #include <string>
+          extern "C" JNIEXPORT jstring JNICALL
+          Java_com_drix_MainActivity_stringFromJNI(JNIEnv* env, jobject thiz) {
+              return env->NewStringUTF("Hello from DriderX Native!");
+          }
+          EOF
+
+      - name: Write C++ server files
+        run: |
+          # server/CMakeLists.txt
+          cat > server/CMakeLists.txt << 'EOF'
+          cmake_minimum_required(VERSION 3.10)
+          project(DriderXServer)
+          set(CMAKE_CXX_STANDARD 17)
+          add_executable(driderx_server src/main.cpp)
+          target_link_libraries(driderx_server pthread)
+          EOF
+
+          # server/src/main.cpp (simple echo server)
+          cat > server/src/main.cpp << 'EOF'
+          #include <iostream>
+          #include <cstring>
+          #include <sys/socket.h>
+          #include <netinet/in.h>
+          #include <unistd.h>
+          int main() {
+              int server_fd, new_socket;
+              struct sockaddr_in address;
+              int opt = 1;
+              int addrlen = sizeof(address);
+              char buffer[1024] = {0};
+              const char* hello = "Hello from DriderX Server!";
+              server_fd = socket(AF_INET, SOCK_STREAM, 0);
+              setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+              address.sin_family = AF_INET;
+              address.sin_addr.s_addr = INADDR_ANY;
+              address.sin_port = htons(8080);
+              bind(server_fd, (struct sockaddr*)&address, sizeof(address));
+              listen(server_fd, 3);
+              std::cout << "Server listening on port 8080" << std::endl;
+              while (true) {
+                  new_socket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen);
+                  read(new_socket, buffer, 1024);
+                  std::cout << "Received: " << buffer << std::endl;
+                  send(new_socket, hello, strlen(hello), 0);
+                  close(new_socket);
+              }
+              return 0;
+          }
+          EOF
+
+      - name: Write top‑level Gradle files and README
+        run: |
+          cat > build.gradle << 'EOF'
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:7.4.0'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          EOF
+
+          cat > settings.gradle << 'EOF'
+          rootProject.name = "DriderX"
+          include ':app'
+          EOF
+
+          cat > gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx2048m
+          android.useAndroidX=true
+          EOF
+
+          cat > README.md << 'EOF'
+          # DriderX
+          Android app with C++ native library and standalone C++ server.
+          - Package: com.drix
+          - Native library: native-lib
+          - Server: C++ echo server on port 8080
+          EOF
+
+      - name: Commit and push all new files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Add initial project structure for DriderX" || echo "No changes to commit"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
