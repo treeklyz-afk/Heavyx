@@ -13,7 +13,6 @@ import java.net.URL;
 
 public class MainActivity extends AppCompatActivity {
     private TextView tv;
-    // Dynamically binds to your repository and active branch
     private static final String PATCH_URL = "https://raw.githubusercontent.com/treeklyz-afk/Heavyx/main/DXs/libnative-lib.so";
     
     public native String stringFromJNI();
@@ -23,7 +22,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         tv = findViewById(R.id.sample_text);
-        tv.setText("Checking for online patches...");
+        tv.setText("Connecting to patch server...");
 
         downloadAndLoadPatch();
     }
@@ -55,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
                         output.close();
                         input.close();
 
-                        // Load the dynamic patch securely from local internal path
+                        // Load the dynamic patch safely into internal data context
                         System.load(localLib.getAbsolutePath());
 
                         new Handler(Looper.getMainLooper()).post(new Runnable() {
@@ -63,17 +62,17 @@ public class MainActivity extends AppCompatActivity {
                             public void run() {
                                 try {
                                     tv.setText(stringFromJNI());
-                                } catch (UnsatisfiedLinkError e) {
-                                    tv.setText("JNI Execution Link Failure!");
+                                } catch (Throwable t) {
+                                    tv.setText("JNI Linkage Failed: " + t.getMessage());
                                 }
                             }
                         });
                     } else {
-                        showError("Patch Server Error: " + connection.getResponseCode());
+                        showError("Patch missing on Git (HTTP " + connection.getResponseCode() + ")");
                     }
-                } catch (final Exception e) {
-                    Log.e("DriderX", "Patch failed", e);
-                    showError("Patch offline or failed to sync!");
+                } catch (final Throwable t) {
+                    Log.e("DriderX", "Execution catch caught", t);
+                    showError("Sync status: " + t.getMessage());
                 }
             }
         }).start();
