@@ -1,21 +1,17 @@
 name: DriderX – Full Build & Structure
 
 on:
-  # Manual trigger – ise click karo sab kuch ho jayega
-  workflow_dispatch:
-  # Push par bhi chalega, lekin [skip ci] wale commit ko ignore karega
+  workflow_dispatch:   # manual trigger only
   push:
     branches: [ main, master ]
     paths-ignore:
       - 'README.md'
 
 jobs:
-  # ======================================================
-  #  JOB 1 : Structure Creation + Push (only if files missing)
-  # ======================================================
   create-structure:
     runs-on: ubuntu-latest
-    # Sirf manual trigger par ya agar files nahi hain toh chalega
+    permissions:
+      contents: write   # <-- FIX: grant write access to push
     if: |
       github.event_name == 'workflow_dispatch' ||
       !(github.event.head_commit.message contains '[skip ci]')
@@ -158,7 +154,7 @@ jobs:
           target_link_libraries(driderx_server pthread)
           EOF
 
-          # server/src/main.cpp (simple echo server)
+          # server/src/main.cpp
           cat > server/src/main.cpp << 'EOF'
           #include <iostream>
           #include <cstring>
@@ -237,13 +233,9 @@ jobs:
           git commit -m "Add initial DriderX project structure [skip ci]" || echo "No changes to commit"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
 
-  # ======================================================
-  #  JOB 2 : Build Android APK (with NDK)
-  # ======================================================
   build-android:
-    needs: create-structure   # structure create hone ke baad hi chalega
+    needs: create-structure
     runs-on: ubuntu-latest
-    # Agar push par trigger hua aur commit me [skip ci] hai toh skip karo
     if: |
       github.event_name == 'workflow_dispatch' ||
       !(github.event.head_commit.message contains '[skip ci]')
@@ -276,9 +268,6 @@ jobs:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/*.apk
 
-  # ======================================================
-  #  JOB 3 : Build C++ Server
-  # ======================================================
   build-server:
     needs: create-structure
     runs-on: ubuntu-latest
