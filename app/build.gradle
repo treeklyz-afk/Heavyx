@@ -5,19 +5,9 @@ android {
     defaultConfig {
         applicationId "com.drix"
         minSdk 21
-        targetSdk 33
+        targetSdk 28
         versionCode 1
         versionName "1.0"
-        externalNativeBuild {
-            cmake {
-                cppFlags "-std=c++17"
-            }
-        }
-    }
-    externalNativeBuild {
-        cmake {
-            path "../native/CMakeLists.txt"
-        }
     }
 }
 dependencies {
