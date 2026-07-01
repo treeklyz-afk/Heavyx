@@ -11,15 +11,14 @@ jobs:
   create-structure:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # <-- FIX: grant write access to push
+      contents: write   # Grant write access to commit project structure
     if: |
       github.event_name == 'workflow_dispatch' ||
-      !(github.event.head_commit.message contains '[skip ci]')
+      (github.event.head_commit && !contains(github.event.head_commit.message, '[skip ci]'))
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          persist-credentials: false
           fetch-depth: 0
 
       - name: Check if structure already exists
@@ -44,6 +43,7 @@ jobs:
           cat > app/build.gradle << 'EOF'
           apply plugin: 'com.android.application'
           android {
+              namespace "com.drix"
               compileSdk 33
               defaultConfig {
                   applicationId "com.drix"
@@ -59,7 +59,7 @@ jobs:
               }
               externalNativeBuild {
                   cmake {
-                      path "native/CMakeLists.txt"
+                      path "../native/CMakeLists.txt"
                   }
               }
           }
@@ -73,7 +73,7 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.drix">
               <application android:label="DriderX">
-                  <activity android:name=".MainActivity">
+                  <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -169,7 +169,7 @@ jobs:
               char buffer[1024] = {0};
               const char* hello = "Hello from DriderX Server!";
               server_fd = socket(AF_INET, SOCK_STREAM, 0);
-              setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+              setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
               address.sin_family = AF_INET;
               address.sin_addr.s_addr = INADDR_ANY;
               address.sin_port = htons(8080);
@@ -224,6 +224,9 @@ jobs:
           - Server: C++ echo server on port 8080
           EOF
 
+          # Generate Gradle Wrapper files so ./gradlew works in downstream jobs
+          gradle wrapper --gradle-version 7.5.1
+
       - name: Commit and push structure (if any new files)
         if: steps.check.outputs.exists == 'false'
         run: |
@@ -231,20 +234,20 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
           git commit -m "Add initial DriderX project structure [skip ci]" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
+          git push origin HEAD:${{ github.ref_name }}
 
   build-android:
     needs: create-structure
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'workflow_dispatch' ||
-      !(github.event.head_commit.message contains '[skip ci]')
+      (github.event.head_commit && !contains(github.event.head_commit.message, '[skip ci]'))
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -273,7 +276,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'workflow_dispatch' ||
-      !(github.event.head_commit.message contains '[skip ci]')
+      (github.event.head_commit && !contains(github.event.head_commit.message, '[skip ci]'))
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
