@@ -29,7 +29,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean isNativeEngineBound = false;
     private String noticePdfUrl = "";
 
-    // Resource Endpoints tracking contexts points dynamically to your storage context
+    // Endpoints structure configuration points
     private static final String ENGINE_REMOTE_URL = "https://raw.githubusercontent.com/treeklyz-afk/Heavyx/main/DXs/libnative-lib.so";
     private static final String APP_CONTROL_JSON = "https://raw.githubusercontent.com/treeklyz-afk/Heavyx/main/DXs/data.json";
 
@@ -51,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
         btnRequest = findViewById(R.id.btn_request_ride);
         btnAlertAction = findViewById(R.id.btn_alert_action);
 
-        // Run control validation checks immediately 
+        // Run remote config assessment loops immediately
         evaluateSystemParameters();
 
         btnRequest.setOnClickListener(new View.OnClickListener() {
@@ -62,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
 
                 if(p.isEmpty() || d.isEmpty()) return;
 
-                // Fire up premium iOS UI loading screen frame layer
+                // Fire up responsive loading interface frame layers
                 loadingOverlay.setVisibility(View.VISIBLE);
 
                 new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
@@ -81,13 +81,13 @@ public class MainActivity extends AppCompatActivity {
                             tvConsoleOutput.setText("Processing local allocation calculations...\nDriver tracking context bound cleanly.");
                         }
 
-                        // Fire up hardware map interface layers via standard Android UI schemas
+                        // Fire up hardware map intent layers via standard runtime components
                         try {
                             Intent mapIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:28.6139,77.2090?q=" + Uri.encode(d)));
                             mapIntent.setPackage("com.google.android.apps.maps");
                             startActivity(mapIntent);
                         } catch (Exception ex) {
-                            // Map package missing guard layer execution
+                            // Map fallback context configuration execution
                         }
                     }
                 }, 2000);
@@ -100,14 +100,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 try {
-                    // Fetch Remote Control JSON configuration array rules 
+                    // Fetch Remote Control JSON configuration arrays
                     URL urlJson = new URL(APP_CONTROL_JSON);
                     HttpURLConnection conn = (HttpURLConnection) urlJson.openConnection();
                     conn.setConnectTimeout(6000);
                     BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                     StringBuilder builder = new StringBuilder();
                     String line;
-                    while ((line = reader.readLine()) != -1) builder.append(line);
+                    // FIX: Replaced != -1 with != null to match string stream iterations safely
+                    while ((line = reader.readLine()) != null) builder.append(line);
                     reader.close();
 
                     JSONObject config = new JSONObject(builder.toString());
@@ -131,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
 
-                    // Download and bind online execution patch runtime engine objects securely
+                    // Load isolated dynamic core patch from remote stream context
                     File localLib = new File(getFilesDir(), "libnative-lib.so");
                     URL urlLib = new URL(ENGINE_REMOTE_URL);
                     HttpURLConnection connLib = (HttpURLConnection) urlLib.openConnection();
