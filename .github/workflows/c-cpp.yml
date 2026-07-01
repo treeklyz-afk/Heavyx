@@ -33,6 +33,10 @@ jobs:
       - name: Create directories and files (if missing)
         if: steps.check.outputs.exists == 'false'
         run: |
+          # FIX: Generate the wrapper FIRST while the workspace configuration is clean
+          gradle wrapper --gradle-version 7.5.1
+
+          # Now create the directory structures safely
           mkdir -p app/src/main/java/com/drix
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
@@ -223,9 +227,6 @@ jobs:
           - Native library: native-lib
           - Server: C++ echo server on port 8080
           EOF
-
-          # Generate Gradle Wrapper files so ./gradlew works in downstream jobs
-          gradle wrapper --gradle-version 7.5.1
 
       - name: Commit and push structure (if any new files)
         if: steps.check.outputs.exists == 'false'
