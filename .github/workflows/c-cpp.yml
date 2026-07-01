@@ -1,47 +1,49 @@
-name: DriderX – Online Patch & Split Build
+name: DriderX – iOS Style Full‑Screen App
 
 on:
-  workflow_dispatch:   # Manual trigger
+  workflow_dispatch:
   push:
     branches: [ main, master ]
     paths-ignore:
       - 'README.md'
-      - 'DXs/**'       # Infinite build loops se bachne ke liye
+      - 'DXs/**'
 
 jobs:
-  patch-and-build:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # STEP 1: Workspace cleanup and wrapper setup
-      - name: Clean Environment & Generate Wrapper Safely
+      - name: Clean & Setup Wrapper
         run: |
           rm -f settings.gradle build.gradle gradle.properties app/build.gradle
           echo "rootProject.name = 'DriderX'" > settings.gradle
           gradle wrapper --gradle-version 7.5.1
 
-      # STEP 2: Injection of advanced hybrid codebase
-      - name: Create Structure & Advanced Driver App Injection
+      - name: Inject Full iOS‑Style Codebase
         run: |
+          # Create directories
           mkdir -p app/src/main/java/com/drix
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
-          mkdir -p native/src/main/cpp
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/animator
+          mkdir -p app/src/main/res/raw
+          mkdir -p app/src/main/cpp
           mkdir -p DXs
 
-          # 1. Root Level Settings
+          # ---- settings.gradle ----
           cat > settings.gradle << 'EOF'
           rootProject.name = "DriderX"
           include ':app'
           EOF
 
-          # 2. App Build Configuration (Target SDK 28 for dynamic storage execution)
+          # ---- app/build.gradle (with Glide & Material) ----
           cat > app/build.gradle << 'EOF'
           apply plugin: 'com.android.application'
           android {
@@ -53,379 +55,1116 @@ jobs:
                   targetSdk 28
                   versionCode 1
                   versionName "1.0"
+                  externalNativeBuild {
+                      cmake {
+                          cppFlags "-std=c++17"
+                          arguments "-DANDROID_STL=c++_shared"
+                      }
+                  }
+              }
+              externalNativeBuild {
+                  cmake {
+                      path "src/main/cpp/CMakeLists.txt"
+                      version "3.18.1"
+                  }
+              }
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                  }
               }
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.9.0'
+              implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+              implementation 'androidx.cardview:cardview:1.0.0'
+              implementation 'androidx.recyclerview:recyclerview:1.3.0'
+              implementation 'com.github.bumptech.glide:glide:4.15.1'
+              annotationProcessor 'com.github.bumptech.glide:compiler:4.15.1'
           }
           EOF
 
-          # 3. iOS Pure Dark Theme Configuration
-          cat > app/src/main/res/values/themes.xml << 'EOF'
-          <resources>
-              <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
-                  <item name="colorPrimary">#000000</item>
-                  <item name="colorPrimaryDark">#000000</item>
-                  <item name="colorAccent">#0A84FF</item>
-              </style>
-          </resources>
-          EOF
-
-          # 4. Clean AndroidManifest.xml
+          # ---- AndroidManifest.xml (full screen activities) ----
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-              
-              <application 
+              <application
                   android:label="DriderX"
                   android:theme="@style/AppTheme">
-                  <activity android:name="com.drix.MainActivity" android:exported="true">
+                  <activity android:name="com.drix.SplashActivity"
+                      android:exported="true"
+                      android:theme="@style/FullScreenTheme">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
+                  <activity android:name="com.drix.MainActivity"
+                      android:theme="@style/AppTheme"
+                      android:exported="false" />
+                  <activity android:name="com.drix.RideDetailActivity"
+                      android:theme="@style/FullScreenTheme"
+                      android:exported="false" />
               </application>
           </manifest>
           EOF
 
-          # 5. MainActivity.java (With Smart Auto-Fallback System)
-          cat > app/src/main/java/com/drix/MainActivity.java << 'EOF'
+          # ---- styles.xml (themes & full screen) ----
+          cat > app/src/main/res/values/themes.xml << 'EOF'
+          <resources>
+              <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+                  <item name="colorPrimary">#000000</item>
+                  <item name="colorPrimaryDark">#000000</item>
+                  <item name="colorAccent">#0A84FF</item>
+                  <item name="android:windowBackground">@drawable/bg_gradient</item>
+                  <item name="android:windowFullscreen">false</item>
+              </style>
+              <style name="FullScreenTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+                  <item name="android:windowFullscreen">true</item>
+                  <item name="android:windowBackground">@drawable/bg_gradient</item>
+                  <item name="android:windowContentOverlay">@null</item>
+              </style>
+          </resources>
+          EOF
+
+          # ---- strings.xml ----
+          cat > app/src/main/res/values/strings.xml << 'EOF'
+          <resources>
+              <string name="app_name">DriderX</string>
+              <string name="loading">Loading…</string>
+          </resources>
+          EOF
+
+          # ---- drawable/bg_gradient.xml ----
+          cat > app/src/main/res/drawable/bg_gradient.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android">
+              <gradient
+                  android:angle="135"
+                  android:startColor="#0F0F0F"
+                  android:endColor="#1A1A2E"
+                  android:type="linear" />
+          </shape>
+          EOF
+
+          # ---- drawable/btn_rounded.xml ----
+          cat > app/src/main/res/drawable/btn_rounded.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android">
+              <corners android:radius="28dp" />
+              <solid android:color="#0A84FF" />
+          </shape>
+          EOF
+
+          # ---- drawable/btn_rounded_white.xml ----
+          cat > app/src/main/res/drawable/btn_rounded_white.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android">
+              <corners android:radius="28dp" />
+              <solid android:color="#FFFFFF" />
+          </shape>
+          EOF
+
+          # ---- animator/card_slide_in.xml ----
+          cat > app/src/main/res/animator/card_slide_in.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <set xmlns:android="http://schemas.android.com/apk/res/android">
+              <objectAnimator
+                  android:propertyName="translationY"
+                  android:valueType="floatType"
+                  android:valueFrom="300"
+                  android:valueTo="0"
+                  android:duration="500"
+                  android:interpolator="@android:anim/decelerate_interpolator" />
+              <objectAnimator
+                  android:propertyName="alpha"
+                  android:valueType="floatType"
+                  android:valueFrom="0"
+                  android:valueTo="1"
+                  android:duration="400"
+                  android:interpolator="@android:anim/decelerate_interpolator" />
+          </set>
+          EOF
+
+          # ---- raw/loading.gif (placeholder - we'll use a URL in code) ----
+          # We'll use Glide to load from URL, no need for local GIF
+
+          # ---- layout/activity_splash.xml ----
+          cat > app/src/main/res/layout/activity_splash.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="@drawable/bg_gradient">
+
+              <ImageView
+                  android:id="@+id/iv_loading"
+                  android:layout_width="150dp"
+                  android:layout_height="150dp"
+                  app:layout_constraintBottom_toTopOf="@+id/tv_loading_text"
+                  app:layout_constraintEnd_toEndOf="parent"
+                  app:layout_constraintStart_toStartOf="parent"
+                  app:layout_constraintTop_toTopOf="parent"
+                  app:layout_constraintVertical_bias="0.4" />
+
+              <TextView
+                  android:id="@+id/tv_loading_text"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="24dp"
+                  android:text="DriderX"
+                  android:textColor="#FFFFFF"
+                  android:textSize="28sp"
+                  android:textStyle="bold"
+                  app:layout_constraintBottom_toBottomOf="parent"
+                  app:layout_constraintEnd_toEndOf="parent"
+                  app:layout_constraintStart_toStartOf="parent"
+                  app:layout_constraintTop_toBottomOf="@+id/iv_loading"
+                  app:layout_constraintVertical_bias="0.2" />
+
+              <ProgressBar
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="16dp"
+                  android:indeterminateTint="#0A84FF"
+                  app:layout_constraintEnd_toEndOf="parent"
+                  app:layout_constraintStart_toStartOf="parent"
+                  app:layout_constraintTop_toBottomOf="@+id/tv_loading_text" />
+          </ConstraintLayout>
+          EOF
+
+          # ---- layout/activity_main.xml (iOS style) ----
+          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="@drawable/bg_gradient"
+              android:padding="16dp">
+
+              <androidx.appcompat.widget.Toolbar
+                  android:id="@+id/toolbar"
+                  android:layout_width="match_parent"
+                  android:layout_height="?attr/actionBarSize"
+                  android:background="@android:color/transparent"
+                  app:titleTextColor="#FFFFFF"
+                  app:title="DriderX"
+                  app:subtitle="Smart Ride Matching"
+                  app:layout_constraintTop_toTopOf="parent" />
+
+              <TextView
+                  android:id="@+id/tv_status"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="8dp"
+                  android:text="Initializing..."
+                  android:textColor="#B0B0B0"
+                  android:textSize="12sp"
+                  app:layout_constraintStart_toStartOf="parent"
+                  app:layout_constraintTop_toBottomOf="@+id/toolbar" />
+
+              <TextView
+                  android:id="@+id/tv_ride_count"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Available: 0"
+                  android:textColor="#4CAF50"
+                  android:textSize="12sp"
+                  app:layout_constraintEnd_toEndOf="parent"
+                  app:layout_constraintTop_toBottomOf="@+id/toolbar" />
+
+              <androidx.cardview.widget.CardView
+                  android:id="@+id/location_card"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="24dp"
+                  app:cardCornerRadius="24dp"
+                  app:cardElevation="12dp"
+                  app:cardBackgroundColor="#1E1E1E"
+                  app:layout_constraintTop_toBottomOf="@+id/tv_status">
+
+                  <ConstraintLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:padding="20dp">
+
+                      <TextView
+                          android:id="@+id/tv_pickup_label"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="PICKUP LOCATION"
+                          android:textColor="#0A84FF"
+                          android:textSize="11sp"
+                          android:textStyle="bold"
+                          app:layout_constraintStart_toStartOf="parent"
+                          app:layout_constraintTop_toTopOf="parent" />
+
+                      <EditText
+                          android:id="@+id/et_pickup"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:background="@android:color/transparent"
+                          android:hint="Where from?"
+                          android:textColor="#FFFFFF"
+                          android:textColorHint="#888888"
+                          android:textSize="16sp"
+                          android:inputType="textPostalAddress"
+                          app:layout_constraintEnd_toEndOf="parent"
+                          app:layout_constraintStart_toStartOf="parent"
+                          app:layout_constraintTop_toBottomOf="@+id/tv_pickup_label" />
+
+                      <View
+                          android:id="@+id/divider1"
+                          android:layout_width="match_parent"
+                          android:layout_height="1dp"
+                          android:layout_marginTop="8dp"
+                          android:background="#333333"
+                          app:layout_constraintTop_toBottomOf="@+id/et_pickup" />
+
+                      <TextView
+                          android:id="@+id/tv_drop_label"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="16dp"
+                          android:text="DROP OFF LOCATION"
+                          android:textColor="#30D158"
+                          android:textSize="11sp"
+                          android:textStyle="bold"
+                          app:layout_constraintStart_toStartOf="parent"
+                          app:layout_constraintTop_toBottomOf="@+id/divider1" />
+
+                      <EditText
+                          android:id="@+id/et_drop"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:background="@android:color/transparent"
+                          android:hint="Where to?"
+                          android:textColor="#FFFFFF"
+                          android:textColorHint="#888888"
+                          android:textSize="16sp"
+                          android:inputType="textPostalAddress"
+                          app:layout_constraintEnd_toEndOf="parent"
+                          app:layout_constraintStart_toStartOf="parent"
+                          app:layout_constraintTop_toBottomOf="@+id/tv_drop_label" />
+                  </ConstraintLayout>
+              </androidx.cardview.widget.CardView>
+
+              <Button
+                  android:id="@+id/btn_find_driver"
+                  android:layout_width="match_parent"
+                  android:layout_height="56dp"
+                  android:layout_marginTop="24dp"
+                  android:background="@drawable/btn_rounded"
+                  android:text="🚀 Find Driver"
+                  android:textColor="#FFFFFF"
+                  android:textSize="18sp"
+                  android:textStyle="bold"
+                  android:textAllCaps="false"
+                  app:layout_constraintTop_toBottomOf="@+id/location_card" />
+
+              <ProgressBar
+                  android:id="@+id/progress_bar"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="16dp"
+                  android:visibility="gone"
+                  android:indeterminateTint="#0A84FF"
+                  app:layout_constraintEnd_toEndOf="parent"
+                  app:layout_constraintStart_toStartOf="parent"
+                  app:layout_constraintTop_toBottomOf="@+id/btn_find_driver" />
+
+              <androidx.cardview.widget.CardView
+                  android:id="@+id/result_card"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="16dp"
+                  android:visibility="gone"
+                  app:cardCornerRadius="24dp"
+                  app:cardElevation="12dp"
+                  app:cardBackgroundColor="#2C2C2E"
+                  app:layout_constraintTop_toBottomOf="@+id/progress_bar">
+
+                  <ConstraintLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:padding="20dp">
+
+                      <TextView
+                          android:id="@+id/tv_driver_status"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:textColor="#FFFFFF"
+                          android:textSize="16sp"
+                          android:textStyle="bold"
+                          app:layout_constraintEnd_toEndOf="parent"
+                          app:layout_constraintStart_toStartOf="parent"
+                          app:layout_constraintTop_toTopOf="parent" />
+
+                      <Button
+                          android:id="@+id/btn_cancel_ride"
+                          android:layout_width="match_parent"
+                          android:layout_height="48dp"
+                          android:layout_marginTop="16dp"
+                          android:backgroundTint="#FF5252"
+                          android:text="Cancel Ride"
+                          android:textColor="#FFFFFF"
+                          android:textStyle="bold"
+                          app:layout_constraintTop_toBottomOf="@+id/tv_driver_status" />
+                  </ConstraintLayout>
+              </androidx.cardview.widget.CardView>
+
+              <TextView
+                  android:id="@+id/tv_nearby"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="24dp"
+                  android:text="Nearby Drivers"
+                  android:textColor="#FFFFFF"
+                  android:textSize="18sp"
+                  android:textStyle="bold"
+                  app:layout_constraintTop_toBottomOf="@+id/result_card" />
+
+              <androidx.cardview.widget.CardView
+                  android:layout_width="match_parent"
+                  android:layout_height="0dp"
+                  android:layout_marginTop="8dp"
+                  app:cardCornerRadius="20dp"
+                  app:cardElevation="8dp"
+                  app:cardBackgroundColor="#1C1C1E"
+                  app:layout_constraintBottom_toBottomOf="parent"
+                  app:layout_constraintTop_toBottomOf="@+id/tv_nearby">
+
+                  <androidx.recyclerview.widget.RecyclerView
+                      android:id="@+id/recycler_drivers"
+                      android:layout_width="match_parent"
+                      android:layout_height="match_parent"
+                      android:padding="8dp"
+                      android:clipToPadding="false" />
+              </androidx.cardview.widget.CardView>
+          </ConstraintLayout>
+          EOF
+
+          # ---- layout/activity_ride_detail.xml (full screen) ----
+          cat > app/src/main/res/layout/activity_ride_detail.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="@drawable/bg_gradient"
+              android:padding="16dp">
+
+              <androidx.appcompat.widget.Toolbar
+                  android:id="@+id/toolbar"
+                  android:layout_width="match_parent"
+                  android:layout_height="?attr/actionBarSize"
+                  android:background="@android:color/transparent"
+                  app:navigationIcon="?attr/homeAsUpIndicator"
+                  app:title="Ride Details"
+                  app:titleTextColor="#FFFFFF"
+                  app:layout_constraintTop_toTopOf="parent" />
+
+              <androidx.cardview.widget.CardView
+                  android:id="@+id/ride_card"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="24dp"
+                  app:cardCornerRadius="24dp"
+                  app:cardElevation="12dp"
+                  app:cardBackgroundColor="#2C2C2E"
+                  app:layout_constraintTop_toBottomOf="@+id/toolbar">
+
+                  <ConstraintLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:padding="24dp">
+
+                      <ImageView
+                          android:id="@+id/iv_driver_avatar"
+                          android:layout_width="80dp"
+                          android:layout_height="80dp"
+                          android:src="@drawable/btn_rounded"
+                          app:layout_constraintStart_toStartOf="parent"
+                          app:layout_constraintTop_toTopOf="parent" />
+
+                      <TextView
+                          android:id="@+id/tv_driver_name"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_marginStart="16dp"
+                          android:text="Driver Name"
+                          android:textColor="#FFFFFF"
+                          android:textSize="20sp"
+                          android:textStyle="bold"
+                          app:layout_constraintEnd_toEndOf="parent"
+                          app:layout_constraintStart_toEndOf="@+id/iv_driver_avatar"
+                          app:layout_constraintTop_toTopOf="@+id/iv_driver_avatar" />
+
+                      <TextView
+                          android:id="@+id/tv_driver_vehicle"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:text="Vehicle (Reg)"
+                          android:textColor="#B0B0B0"
+                          android:textSize="14sp"
+                          app:layout_constraintEnd_toEndOf="parent"
+                          app:layout_constraintStart_toStartOf="@+id/tv_driver_name"
+                          app:layout_constraintTop_toBottomOf="@+id/tv_driver_name" />
+
+                      <TextView
+                          android:id="@+id/tv_driver_rating"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="8dp"
+                          android:text="4.5 ⭐"
+                          android:textColor="#FFC107"
+                          android:textSize="14sp"
+                          app:layout_constraintStart_toStartOf="@+id/tv_driver_name"
+                          app:layout_constraintTop_toBottomOf="@+id/tv_driver_vehicle" />
+
+                      <TextView
+                          android:id="@+id/tv_eta"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="ETA: 5 min"
+                          android:textColor="#0A84FF"
+                          android:textSize="14sp"
+                          android:layout_marginStart="16dp"
+                          app:layout_constraintStart_toEndOf="@+id/tv_driver_rating"
+                          app:layout_constraintTop_toBottomOf="@+id/tv_driver_vehicle" />
+                  </ConstraintLayout>
+              </androidx.cardview.widget.CardView>
+
+              <!-- Additional details could go here -->
+
+          </ConstraintLayout>
+          EOF
+
+          # ---- layout/item_driver.xml (same as before) ----
+          cat > app/src/main/res/layout/item_driver.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:padding="12dp"
+              android:background="?android:attr/selectableItemBackground">
+
+              <TextView
+                  android:id="@+id/tv_driver_name"
+                  android:layout_width="0dp"
+                  android:layout_height="wrap_content"
+                  android:text="Driver Name"
+                  android:textColor="#FFFFFF"
+                  android:textSize="16sp"
+                  android:textStyle="bold"
+                  app:layout_constraintEnd_toEndOf="parent"
+                  app:layout_constraintStart_toStartOf="parent"
+                  app:layout_constraintTop_toTopOf="parent" />
+
+              <TextView
+                  android:id="@+id/tv_driver_vehicle"
+                  android:layout_width="0dp"
+                  android:layout_height="wrap_content"
+                  android:text="Vehicle (Reg)"
+                  android:textColor="#B0B0B0"
+                  android:textSize="14sp"
+                  app:layout_constraintEnd_toEndOf="parent"
+                  app:layout_constraintStart_toStartOf="parent"
+                  app:layout_constraintTop_toBottomOf="@+id/tv_driver_name" />
+
+              <TextView
+                  android:id="@+id/tv_driver_rating"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="4.5 ⭐"
+                  android:textColor="#FFC107"
+                  android:textSize="14sp"
+                  app:layout_constraintStart_toStartOf="parent"
+                  app:layout_constraintTop_toBottomOf="@+id/tv_driver_vehicle" />
+
+              <TextView
+                  android:id="@+id/tv_driver_status"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Online"
+                  android:textColor="#4CAF50"
+                  android:textSize="14sp"
+                  android:layout_marginStart="16dp"
+                  app:layout_constraintStart_toEndOf="@+id/tv_driver_rating"
+                  app:layout_constraintTop_toBottomOf="@+id/tv_driver_vehicle" />
+
+              <TextView
+                  android:id="@+id/tv_driver_eta"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="ETA: 5 min"
+                  android:textColor="#888888"
+                  android:textSize="14sp"
+                  android:layout_marginStart="16dp"
+                  app:layout_constraintStart_toEndOf="@+id/tv_driver_status"
+                  app:layout_constraintTop_toBottomOf="@+id/tv_driver_vehicle" />
+
+              <View
+                  android:layout_width="match_parent"
+                  android:layout_height="1dp"
+                  android:background="#333333"
+                  android:layout_marginTop="8dp"
+                  app:layout_constraintTop_toBottomOf="@+id/tv_driver_vehicle" />
+          </ConstraintLayout>
+          EOF
+
+          # ---- Java: SplashActivity.java ----
+          cat > app/src/main/java/com/drix/SplashActivity.java << 'EOF'
           package com.drix;
 
-          import androidx.appcompat.app.AppCompatActivity;
+          import android.content.Intent;
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
+          import android.widget.ImageView;
+          import androidx.appcompat.app.AppCompatActivity;
+          import com.bumptech.glide.Glide;
+
+          public class SplashActivity extends AppCompatActivity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_splash);
+
+                  ImageView ivLoading = findViewById(R.id.iv_loading);
+                  // Load a loading GIF from URL (you can replace with a local raw resource)
+                  Glide.with(this)
+                      .load("https://media.giphy.com/media/3o7aTskHeUcC68uW6A/giphy.gif")
+                      .into(ivLoading);
+
+                  // Delay and go to MainActivity
+                  new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                      startActivity(new Intent(SplashActivity.this, MainActivity.class));
+                      finish();
+                  }, 3000);
+              }
+          }
+          EOF
+
+          # ---- Java: MainActivity.java (with navigation & animations) ----
+          cat > app/src/main/java/com/drix/MainActivity.java << 'EOF'
+          package com.drix;
+
+          import android.animation.AnimatorInflater;
+          import android.animation.AnimatorSet;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.net.ConnectivityManager;
+          import android.net.NetworkInfo;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.text.TextUtils;
           import android.view.View;
           import android.widget.Button;
           import android.widget.EditText;
-          import android.widget.LinearLayout;
+          import android.widget.ProgressBar;
           import android.widget.TextView;
-          import android.util.Log;
+          import android.widget.Toast;
+
+          import androidx.appcompat.app.AppCompatActivity;
+          import androidx.appcompat.widget.Toolbar;
+          import androidx.cardview.widget.CardView;
+          import androidx.recyclerview.widget.LinearLayoutManager;
+          import androidx.recyclerview.widget.RecyclerView;
+
           import java.io.File;
           import java.io.FileOutputStream;
           import java.io.InputStream;
           import java.net.HttpURLConnection;
           import java.net.URL;
+          import java.util.ArrayList;
+          import java.util.List;
           import java.util.Random;
 
           public class MainActivity extends AppCompatActivity {
-              private TextView tvStatus;
-              private TextView tvDriverStatus;
+              private TextView tvStatus, tvDriverStatus, tvRideCount;
               private EditText etPickup, etDrop;
-              private Button btnFindDriver;
-              private LinearLayout resultLayout;
+              private Button btnFindDriver, btnCancelRide;
+              private CardView resultCard;
+              private RecyclerView recyclerDrivers;
+              private ProgressBar progressBar;
               private boolean isPatchLoaded = false;
-
               private static final String PATCH_URL = "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/DXs/libnative-lib.so";
-              
+
               public native String findDriverNative(String pickup, String drop);
+              public native void initDriverPoolNative();
+              public native String getAllDriversNative();
+              public native void updateDriverLocationsNative();
+
+              private List<Driver> driverList = new ArrayList<>();
+              private DriverAdapter driverAdapter;
+              private Handler handler = new Handler(Looper.getMainLooper());
+              private Runnable locationUpdater;
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
 
-                  tvStatus = findViewById(R.id.sample_text);
+                  tvStatus = findViewById(R.id.tv_status);
                   tvDriverStatus = findViewById(R.id.tv_driver_status);
+                  tvRideCount = findViewById(R.id.tv_ride_count);
                   etPickup = findViewById(R.id.et_pickup);
                   etDrop = findViewById(R.id.et_drop);
                   btnFindDriver = findViewById(R.id.btn_find_driver);
-                  resultLayout = findViewById(R.id.result_layout);
+                  btnCancelRide = findViewById(R.id.btn_cancel_ride);
+                  resultCard = findViewById(R.id.result_card);
+                  recyclerDrivers = findViewById(R.id.recycler_drivers);
+                  progressBar = findViewById(R.id.progress_bar);
 
-                  // Button is always clickable from start!
+                  Toolbar toolbar = findViewById(R.id.toolbar);
+                  setSupportActionBar(toolbar);
+                  if (getSupportActionBar() != null) {
+                      getSupportActionBar().setTitle("DriderX");
+                      getSupportActionBar().setDisplayHomeAsUpEnabled(false);
+                  }
+
+                  recyclerDrivers.setLayoutManager(new LinearLayoutManager(this));
+                  driverAdapter = new DriverAdapter(driverList);
+                  recyclerDrivers.setAdapter(driverAdapter);
+
                   btnFindDriver.setEnabled(true);
                   tvStatus.setText("DriderX Engine: Core Initialized");
 
-                  // Try loading online patch in background
                   downloadAndLoadPatch();
 
-                  btnFindDriver.setOnClickListener(new View.OnClickListener() {
-                      @Override
-                      public void onClick(View v) {
-                          String pickupTxt = etPickup.getText().toString().trim();
-                          String dropTxt = etDrop.getText().toString().trim();
-
-                          if (pickupTxt.isEmpty() || dropTxt.isEmpty()) {
-                              resultLayout.setVisibility(View.VISIBLE);
-                              tvDriverStatus.setText("Please enter valid locations.");
-                              return;
-                          }
-
-                          resultLayout.setVisibility(View.VISIBLE);
-
-                          if (isPatchLoaded) {
-                              try {
-                                  // Run advanced C++ algorithms if patch is live
-                                  String dynamicResult = findDriverNative(pickupTxt, dropTxt);
-                                  tvDriverStatus.setText(dynamicResult);
-                              } catch (Throwable t) {
-                                  // Fallback to local execution if link drops
-                                  runJavaFallback(pickupTxt, dropTxt);
-                              }
-                          } else {
-                              // Instant fallback if patch isn't loaded yet
-                              runJavaFallback(pickupTxt, dropTxt);
-                          }
+                  btnFindDriver.setOnClickListener(v -> {
+                      String pickup = etPickup.getText().toString().trim();
+                      String drop = etDrop.getText().toString().trim();
+                      if (TextUtils.isEmpty(pickup) || TextUtils.isEmpty(drop)) {
+                          Toast.makeText(MainActivity.this, "Please enter both locations", Toast.LENGTH_SHORT).show();
+                          return;
                       }
+                      findDriver(pickup, drop);
                   });
+
+                  btnCancelRide.setOnClickListener(v -> {
+                      resultCard.setVisibility(View.GONE);
+                      tvDriverStatus.setText("");
+                      Toast.makeText(this, "Ride cancelled", Toast.LENGTH_SHORT).show();
+                  });
+
+                  if (isPatchLoaded) {
+                      initDriverPoolNative();
+                  }
+                  startLocationUpdates();
               }
 
-              private void runJavaFallback(String pickup, String drop) {
-                  String[] drivers = {"Vikram Singh [Rider Pro]", "Rajesh Kumar [Elite]", "Aman Verma [X-Prime]"};
-                  String[] vehicles = {"(KA-03-HA-4321)", "(DL-01-CA-9876)", "(BR-01-PC-5543)"};
-                  
-                  Random rand = new Random();
-                  int idx = rand.nextInt(3);
-                  int eta = 3 + rand.nextInt(5);
+              private void findDriver(String pickup, String drop) {
+                  progressBar.setVisibility(View.VISIBLE);
+                  btnFindDriver.setEnabled(false);
+                  resultCard.setVisibility(View.GONE);
 
-                  String res = "⚡ Driver Matched (Internal Mode)!\n\n"
-                             + "Driver: " + drivers[idx] + "\n"
-                             + "Vehicle: " + vehicles[idx] + "\n"
-                             + "Route: " + pickup + " -> " + drop + "\n"
-                             + "Status: Arriving in " + eta + " mins";
-                  
-                  tvDriverStatus.setText(res);
-              }
-
-              private void downloadAndLoadPatch() {
-                  new Thread(new Runnable() {
-                      @Override
-                      public void run() {
+                  new Thread(() -> {
+                      if (isPatchLoaded) {
                           try {
-                              File localLib = new File(getFilesDir(), "libnative-lib.so");
-                              URL url = new URL(PATCH_URL);
-                              HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                              connection.setConnectTimeout(8000);
-                              connection.setReadTimeout(8000);
-                              connection.connect();
-
-                              if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                                  InputStream input = connection.getInputStream();
-                                  FileOutputStream output = new FileOutputStream(localLib);
-                                  byte[] buffer = new byte[4096];
-                                  int bytesRead;
-                                  while ((bytesRead = input.read(buffer)) != -1) {
-                                      output.write(buffer, 0, bytesRead);
-                                  }
-                                  output.flush();
-                                  output.close();
-                                  input.close();
-
-                                  System.load(localLib.getAbsolutePath());
-                                  isPatchLoaded = true;
-
-                                  new Handler(Looper.getMainLooper()).post(new Runnable() {
-                                      @Override
-                                      public void run() {
-                                          tvStatus.setText("DriderX Engine: High-Performance Patch Active");
-                                      }
-                                  });
-                              } else {
-                                  updateStatus("DriderX Engine: Ready (Cloud sync pending)");
-                              }
-                          } catch (final Throwable t) {
-                              updateStatus("DriderX Engine: Ready (Standby Mode)");
+                              String result = findDriverNative(pickup, drop);
+                              runOnUiThread(() -> showResult(result));
+                          } catch (Throwable t) {
+                              runOnUiThread(() -> fallbackJava(pickup, drop));
                           }
+                      } else {
+                          runOnUiThread(() -> fallbackJava(pickup, drop));
                       }
                   }).start();
               }
 
-              private void updateStatus(final String msg) {
-                  new Handler(Looper.getMainLooper()).post(new Runnable() {
-                      @Override
-                      public void run() {
-                          tvStatus.setText(msg);
+              private void showResult(String result) {
+                  progressBar.setVisibility(View.GONE);
+                  btnFindDriver.setEnabled(true);
+                  tvDriverStatus.setText(result);
+                  resultCard.setVisibility(View.VISIBLE);
+                  AnimatorSet anim = (AnimatorSet) AnimatorInflater.loadAnimator(this, R.animator.card_slide_in);
+                  anim.setTarget(resultCard);
+                  anim.start();
+
+                  // Optionally navigate to RideDetailActivity after a delay
+                  // For demo, we'll just show the card.
+              }
+
+              private void fallbackJava(String pickup, String drop) {
+                  progressBar.setVisibility(View.GONE);
+                  btnFindDriver.setEnabled(true);
+                  String[] drivers = {"Vikram Singh", "Rajesh Kumar", "Aman Verma"};
+                  String[] vehicles = {"Toyota Etios", "Maruti Dzire", "Hyundai i20"};
+                  String[] regs = {"KA-03-HA-4321", "DL-01-CA-9876", "BR-01-PC-5543"};
+                  Random rand = new Random();
+                  int idx = rand.nextInt(3);
+                  int eta = 3 + rand.nextInt(5);
+                  String res = "⚡ Driver Matched (Internal Mode)!\n\n" +
+                          "Driver: " + drivers[idx] + "\n" +
+                          "Vehicle: " + vehicles[idx] + " (" + regs[idx] + ")\n" +
+                          "Route: " + pickup + " -> " + drop + "\n" +
+                          "Status: Arriving in " + eta + " mins";
+                  showResult(res);
+              }
+
+              private void downloadAndLoadPatch() {
+                  new Thread(() -> {
+                      try {
+                          File localLib = new File(getFilesDir(), "libnative-lib.so");
+                          URL url = new URL(PATCH_URL);
+                          HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                          conn.setConnectTimeout(8000);
+                          conn.setReadTimeout(8000);
+                          if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                              try (InputStream in = conn.getInputStream();
+                                   FileOutputStream out = new FileOutputStream(localLib)) {
+                                  byte[] buffer = new byte[4096];
+                                  int read;
+                                  while ((read = in.read(buffer)) != -1) {
+                                      out.write(buffer, 0, read);
+                                  }
+                              }
+                              System.load(localLib.getAbsolutePath());
+                              isPatchLoaded = true;
+                              runOnUiThread(() -> {
+                                  tvStatus.setText("DriderX Engine: High-Performance Patch Active");
+                                  initDriverPoolNative();
+                              });
+                          } else {
+                              runOnUiThread(() -> tvStatus.setText("DriderX Engine: Ready (Cloud sync pending)"));
+                          }
+                      } catch (Throwable t) {
+                          runOnUiThread(() -> tvStatus.setText("DriderX Engine: Ready (Standby Mode)"));
                       }
-                  });
+                  }).start();
+              }
+
+              private void startLocationUpdates() {
+                  locationUpdater = () -> {
+                      if (isPatchLoaded) {
+                          updateDriverLocationsNative();
+                          refreshDriverList();
+                      }
+                      handler.postDelayed(locationUpdater, 5000);
+                  };
+                  handler.post(locationUpdater);
+              }
+
+              private void refreshDriverList() {
+                  new Thread(() -> {
+                      try {
+                          String data = getAllDriversNative();
+                          List<Driver> updated = parseDriverData(data);
+                          runOnUiThread(() -> {
+                              driverList.clear();
+                              driverList.addAll(updated);
+                              driverAdapter.notifyDataSetChanged();
+                              tvRideCount.setText("Available: " + countAvailable(updated));
+                          });
+                      } catch (Exception e) {
+                          e.printStackTrace();
+                      }
+                  }).start();
+              }
+
+              private List<Driver> parseDriverData(String raw) {
+                  List<Driver> list = new ArrayList<>();
+                  if (raw == null || raw.isEmpty()) return list;
+                  String[] lines = raw.split("\n");
+                  for (String line : lines) {
+                      if (line.trim().isEmpty()) continue;
+                      String[] parts = line.split("\\|");
+                      if (parts.length < 11) continue;
+                      Driver d = new Driver();
+                      d.id = parts[0];
+                      d.name = parts[1];
+                      d.vehicle = parts[2];
+                      d.regNumber = parts[3];
+                      d.rating = Double.parseDouble(parts[4]);
+                      d.available = Boolean.parseBoolean(parts[5]);
+                      d.status = parts[6];
+                      d.eta = Integer.parseInt(parts[7]);
+                      d.priceMultiplier = Double.parseDouble(parts[8]);
+                      list.add(d);
+                  }
+                  return list;
+              }
+
+              private int countAvailable(List<Driver> list) {
+                  int count = 0;
+                  for (Driver d : list) if (d.available && "online".equals(d.status)) count++;
+                  return count;
+              }
+
+              private boolean isNetworkAvailable() {
+                  ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+                  NetworkInfo netInfo = cm.getActiveNetworkInfo();
+                  return netInfo != null && netInfo.isConnected();
+              }
+
+              @Override
+              protected void onDestroy() {
+                  super.onDestroy();
+                  if (handler != null && locationUpdater != null) {
+                      handler.removeCallbacks(locationUpdater);
+                  }
+              }
+
+              @Override
+              public void onBackPressed() {
+                  // Handle back navigation - close app or go to previous
+                  super.onBackPressed();
               }
           }
           EOF
 
-          # 6. FIXED iOS Pitch Black Layout
-          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:background="#000000"
-              android:padding="20dp">
+          # ---- Java: RideDetailActivity.java (full screen) ----
+          cat > app/src/main/java/com/drix/RideDetailActivity.java << 'EOF'
+          package com.drix;
 
-              <TextView
-                  android:id="@+id/header_title"
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:layout_marginTop="24dp"
-                  android:text="DriderX Ride"
-                  android:textColor="#FFFFFF"
-                  android:textSize="28sp"
-                  android:textStyle="bold" />
+          import android.os.Bundle;
+          import android.view.View;
+          import androidx.appcompat.app.AppCompatActivity;
+          import androidx.appcompat.widget.Toolbar;
 
-              <TextView
-                  android:id="@+id/sample_text"
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:layout_below="@id/header_title"
-                  android:layout_marginTop="8dp"
-                  android:text="Initializing secure core..."
-                  android:textColor="#8E8E93"
-                  android:textSize="14sp" />
+          public class RideDetailActivity extends AppCompatActivity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_ride_detail);
 
-              <LinearLayout
-                  android:id="@+id/location_card"
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:layout_centerInParent="true"
-                  android:orientation="vertical">
+                  Toolbar toolbar = findViewById(R.id.toolbar);
+                  setSupportActionBar(toolbar);
+                  if (getSupportActionBar() != null) {
+                      getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+                      getSupportActionBar().setTitle("Ride Details");
+                  }
+                  toolbar.setNavigationOnClickListener(v -> onBackPressed());
+              }
 
-                  <LinearLayout
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:background="#1C1C1E"
-                      android:orientation="vertical"
-                      android:padding="16dp">
-
-                      <TextView
-                          android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
-                          android:text="PICKUP LOCATION"
-                          android:textColor="#0A84FF"
-                          android:textSize="11sp"
-                          android:textStyle="bold" />
-
-                      <EditText
-                          android:id="@+id/et_pickup"
-                          android:layout_width="match_parent"
-                          android:layout_height="44dp"
-                          android:background="@android:color/transparent"
-                          android:hint="Where from?"
-                          android:textColor="#FFFFFF"
-                          android:textColorHint="#48484A"
-                          android:textSize="16sp"
-                          android:importantForAutofill="no"
-                          android:inputType="textPostalAddress" />
-
-                      <View
-                          android:layout_width="match_parent"
-                          android:layout_height="0.5dp"
-                          android:layout_marginTop="12dp"
-                          android:layout_marginBottom="12dp"
-                          android:background="#38383A" />
-
-                      <TextView
-                          android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
-                          android:text="DROP OFF LOCATION"
-                          android:textColor="#30D158"
-                          android:textSize="11sp"
-                          android:textStyle="bold" />
-
-                      <EditText
-                          android:id="@+id/et_drop"
-                          android:layout_width="match_parent"
-                          android:layout_height="44dp"
-                          android:background="@android:color/transparent"
-                          android:hint="Where to?"
-                          android:textColor="#FFFFFF"
-                          android:textColorHint="#48484A"
-                          android:textSize="16sp"
-                          android:importantForAutofill="no"
-                          android:inputType="textPostalAddress" />
-                  </LinearLayout>
-
-                  <Button
-                      android:id="@+id/btn_find_driver"
-                      android:layout_width="match_parent"
-                      android:layout_height="54dp"
-                      android:layout_marginTop="24dp"
-                      android:backgroundTint="#FFFFFF"
-                      android:text="Request DriderX"
-                      android:textColor="#000000"
-                      android:textSize="17sp"
-                      android:textStyle="bold"
-                      android:textAllCaps="false" />
-              </LinearLayout>
-
-              <LinearLayout
-                  android:id="@+id/result_layout"
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:layout_below="@id/location_card"
-                  android:layout_marginTop="20dp"
-                  android:background="#1C1C1E"
-                  android:orientation="vertical"
-                  android:padding="16dp"
-                  android:visibility="invisible">
-
-                  <TextView
-                      android:id="@+id/tv_driver_status"
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:textColor="#FFFFFF"
-                      android:textSize="15sp" />
-              </LinearLayout>
-          </RelativeLayout>
+              @Override
+              public void onBackPressed() {
+                  super.onBackPressed();
+                  // Custom back handling if needed
+              }
+          }
           EOF
 
-          cat > app/src/main/res/values/strings.xml << 'EOF'
-          <resources>
-              <string name="app_name">DriderX</string>
-          </resources>
+          # ---- Java: Driver.java (same) ----
+          cat > app/src/main/java/com/drix/Driver.java << 'EOF'
+          package com.drix;
+          public class Driver {
+              public String id, name, vehicle, regNumber, status;
+              public double rating, priceMultiplier;
+              public int eta;
+              public boolean available;
+              public double lat, lng;
+              public Driver() {}
+          }
           EOF
 
-          # 7. Advanced Native C++ Driver Allocation Core Logic
-          cat > native/CMakeLists.txt << 'EOF'
+          # ---- Java: DriverAdapter.java ----
+          cat > app/src/main/java/com/drix/DriverAdapter.java << 'EOF'
+          package com.drix;
+          import android.view.LayoutInflater;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.widget.TextView;
+          import androidx.annotation.NonNull;
+          import androidx.recyclerview.widget.RecyclerView;
+          import java.util.List;
+
+          public class DriverAdapter extends RecyclerView.Adapter<DriverAdapter.DriverViewHolder> {
+              private List<Driver> drivers;
+              public DriverAdapter(List<Driver> drivers) { this.drivers = drivers; }
+
+              @NonNull
+              @Override
+              public DriverViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                  View view = LayoutInflater.from(parent.getContext())
+                          .inflate(R.layout.item_driver, parent, false);
+                  return new DriverViewHolder(view);
+              }
+
+              @Override
+              public void onBindViewHolder(@NonNull DriverViewHolder holder, int position) {
+                  Driver d = drivers.get(position);
+                  holder.tvName.setText(d.name);
+                  holder.tvVehicle.setText(d.vehicle + " (" + d.regNumber + ")");
+                  holder.tvRating.setText(String.format("%.1f", d.rating) + " ⭐");
+                  holder.tvStatus.setText(d.status);
+                  holder.tvStatus.setTextColor(d.available ? 0xFF4CAF50 : 0xFFFF5722);
+                  holder.tvEta.setText(d.available ? "ETA: " + d.eta + " min" : "On Ride");
+              }
+
+              @Override
+              public int getItemCount() { return drivers.size(); }
+
+              static class DriverViewHolder extends RecyclerView.ViewHolder {
+                  TextView tvName, tvVehicle, tvRating, tvStatus, tvEta;
+                  public DriverViewHolder(@NonNull View itemView) {
+                      super(itemView);
+                      tvName = itemView.findViewById(R.id.tv_driver_name);
+                      tvVehicle = itemView.findViewById(R.id.tv_driver_vehicle);
+                      tvRating = itemView.findViewById(R.id.tv_driver_rating);
+                      tvStatus = itemView.findViewById(R.id.tv_driver_status);
+                      tvEta = itemView.findViewById(R.id.tv_driver_eta);
+                  }
+              }
+          }
+          EOF
+
+          # ---- CMakeLists.txt ----
+          cat > app/src/main/cpp/CMakeLists.txt << 'EOF'
           cmake_minimum_required(VERSION 3.18)
           project("native-lib")
           set(CMAKE_CXX_STANDARD 17)
-          add_library(native-lib SHARED src/main/cpp/native-lib.cpp)
+          add_library(native-lib SHARED native-lib.cpp)
           find_library(log-lib log)
           target_link_libraries(native-lib ${log-lib})
           EOF
 
-          cat > native/src/main/cpp/native-lib.cpp << 'EOF'
+          # ---- native-lib.cpp (advanced matching - same) ----
+          cat > app/src/main/cpp/native-lib.cpp << 'EOF'
           #include <jni.h>
           #include <string>
+          #include <vector>
           #include <random>
           #include <sstream>
+          #include <cmath>
+          #include <algorithm>
+          #include <chrono>
+          #include <iomanip>
+
+          struct Driver {
+              std::string id, name, vehicle, regNumber, status;
+              double lat, lng, rating, priceMultiplier;
+              int eta;
+              bool available;
+          };
+
+          static std::vector<Driver> driverPool;
+          static std::mt19937 rng(std::chrono::steady_clock::now().time_since_epoch().count());
+
+          double haversine(double lat1, double lon1, double lat2, double lon2) {
+              const double R = 6371.0;
+              double dLat = (lat2 - lat1) * M_PI / 180.0;
+              double dLon = (lon2 - lon1) * M_PI / 180.0;
+              double a = sin(dLat / 2) * sin(dLat / 2) +
+                         cos(lat1 * M_PI / 180.0) * cos(lat2 * M_PI / 180.0) *
+                         sin(dLon / 2) * sin(dLon / 2);
+              double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+              return R * c;
+          }
+
+          extern "C" JNIEXPORT void JNICALL
+          Java_com_drix_MainActivity_initDriverPoolNative(JNIEnv *env, jobject thiz) {
+              driverPool.clear();
+              const char *names[] = {"Vikram Singh", "Rajesh Kumar", "Aman Verma", "Priya Sharma", "Arjun Reddy",
+                                     "Sneha Kapoor", "Ravi Desai", "Neha Joshi", "Karan Mehta", "Pooja Nair"};
+              const char *vehicles[] = {"Toyota Etios", "Maruti Dzire", "Hyundai i20", "Honda City", "Mahindra XUV"};
+              const char *regs[] = {"KA-03-HA-4321", "DL-01-CA-9876", "BR-01-PC-5543", "MH-12-AB-1234", "TN-07-CD-5678"};
+              for (int i = 0; i < 10; i++) {
+                  Driver d;
+                  d.id = "D" + std::to_string(i + 100);
+                  d.name = names[i % 10];
+                  d.vehicle = vehicles[i % 5];
+                  d.regNumber = regs[i % 5];
+                  d.lat = 28.6139 + ((rand() % 2000 - 1000) / 10000.0);
+                  d.lng = 77.2090 + ((rand() % 2000 - 1000) / 10000.0);
+                  d.rating = 4.0 + (rand() % 10) / 10.0;
+                  d.available = true;
+                  d.eta = 0;
+                  d.priceMultiplier = 1.0 + (rand() % 5) / 10.0;
+                  d.status = "online";
+                  driverPool.push_back(d);
+              }
+          }
 
           extern "C" JNIEXPORT jstring JNICALL
-          Java_com_drix_MainActivity_findDriverNative(JNIEnv* env, jobject thiz, jstring pickup, jstring drop) {
-              
-              const char* pickupChars = env->GetStringUTFChars(pickup, nullptr);
-              const char* dropChars = env->GetStringUTFChars(drop, nullptr);
-              
-              std::string pickupLocation(pickupChars);
-              std::string dropLocation(dropChars);
-              
+          Java_com_drix_MainActivity_findDriverNative(JNIEnv *env, jobject thiz, jstring pickup, jstring drop) {
+              const char *pickupChars = env->GetStringUTFChars(pickup, nullptr);
+              const char *dropChars = env->GetStringUTFChars(drop, nullptr);
+              std::string pickupStr(pickupChars), dropStr(dropChars);
               env->ReleaseStringUTFChars(pickup, pickupChars);
               env->ReleaseStringUTFChars(drop, dropChars);
-              
-              std::string drivers[] = {"Vikram Singh [Rider Pro]", "Rajesh Kumar [Elite]", "Aman Verma [X-Prime]"};
-              std::string vehicles[] = {"(KA-03-HA-4321)", "(DL-01-CA-9876)", "(BR-01-PC-5543)"};
-              
-              std::random_device rd;
-              std::mt19937 gen(rd());
-              std::uniform_int_distribution<> dist(0, 2);
-              std::uniform_int_distribution<> timeDist(2, 7);
-              
-              int index = dist(gen);
-              int eta = timeDist(gen);
-              
+
+              double pickupLat = 28.6139, pickupLng = 77.2090;
+              double dropLat = 28.7041, dropLng = 77.1025;
+
+              double bestScore = -1.0;
+              Driver bestDriver;
+              bool found = false;
+
+              for (const auto &d : driverPool) {
+                  if (!d.available || d.status != "online") continue;
+                  double dist = haversine(pickupLat, pickupLng, d.lat, d.lng);
+                  if (dist > 10.0) continue;
+                  double score = (10.0 - dist) * 1.5 + d.rating * 2.0 - d.priceMultiplier * 0.5;
+                  if (score > bestScore) {
+                      bestScore = score;
+                      bestDriver = d;
+                      found = true;
+                  }
+              }
+
+              if (!found) {
+                  std::stringstream ss;
+                  ss << "❌ No drivers available in your area. Please try again later.";
+                  return env->NewStringUTF(ss.str().c_str());
+              }
+
+              double dist = haversine(pickupLat, pickupLng, bestDriver.lat, bestDriver.lng);
+              int eta = static_cast<int>(dist / 30.0 * 60.0);
+              bestDriver.eta = std::max(2, eta);
+
               std::stringstream response;
-              response << "⚡ Driver Matched (Cloud Core Live)!\n\n"
-                       << "Driver: " << drivers[index] << "\n"
-                       << "Vehicle: " << vehicles[index] << "\n"
-                       << "Route: " << pickupLocation << " -> " << dropLocation << "\n"
-                       << "Status: Arriving in " << eta << " mins";
-                       
+              response << "✅ Driver Matched Successfully!\n\n"
+                       << "👤 Rider: " << bestDriver.name << "\n"
+                       << "🚗 Vehicle: " << bestDriver.vehicle << " (" << bestDriver.regNumber << ")\n"
+                       << "⭐ Rating: " << std::fixed << std::setprecision(1) << bestDriver.rating << "/5.0\n"
+                       << "💰 Price Multiplier: " << bestDriver.priceMultiplier << "x\n"
+                       << "📍 Pickup: " << pickupStr << "\n"
+                       << "🏁 Drop: " << dropStr << "\n"
+                       << "⏱️ ETA: " << bestDriver.eta << " mins\n"
+                       << "📏 Distance: " << std::fixed << std::setprecision(1) << dist << " km";
+
+              for (auto &d : driverPool) {
+                  if (d.id == bestDriver.id) {
+                      d.available = false;
+                      d.status = "onride";
+                      break;
+                  }
+              }
               return env->NewStringUTF(response.str().c_str());
+          }
+
+          extern "C" JNIEXPORT jstring JNICALL
+          Java_com_drix_MainActivity_getAllDriversNative(JNIEnv *env, jobject thiz) {
+              std::stringstream ss;
+              for (const auto &d : driverPool) {
+                  ss << d.id << "|" << d.name << "|" << d.vehicle << "|" << d.regNumber << "|"
+                     << d.rating << "|" << d.available << "|" << d.status << "|" << d.eta << "|"
+                     << d.priceMultiplier << "|" << d.lat << "|" << d.lng << "\n";
+              }
+              return env->NewStringUTF(ss.str().c_str());
+          }
+
+          extern "C" JNIEXPORT void JNICALL
+          Java_com_drix_MainActivity_updateDriverLocationsNative(JNIEnv *env, jobject thiz) {
+              for (auto &d : driverPool) {
+                  if (d.status == "online") {
+                      d.lat += (rand() % 100 - 50) / 50000.0;
+                      d.lng += (rand() % 100 - 50) / 50000.0;
+                  }
+              }
           }
           EOF
 
-          # 8. Main Configuration Scripts
+          # ---- build.gradle (project level) ----
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral(); }
@@ -434,14 +1173,16 @@ jobs:
           allprojects { repositories { google(); mavenCentral(); } }
           EOF
 
+          # ---- gradle.properties ----
           cat > gradle.properties << 'EOF'
           org.gradle.jvmargs=-Xmx2048m
           android.useAndroidX=true
           EOF
 
+          # ---- README.md ----
           cat > README.md << 'EOF'
-          # DriderX
-          Advanced iOS style Dark UI Ride App with dynamic fail-safe layout routing.
+          # DriderX - iOS Style Full Screen Ride App
+          Features: Splash with GIF, dark iOS UI, card animations, full-screen pages, back navigation, live driver updates.
           EOF
 
       - name: Set up JDK 17
@@ -450,42 +1191,26 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK & NDK Toolchain
+      - name: Setup Android SDK & NDK
         uses: android-actions/setup-android@v3
 
-      - name: Install NDK Components
+      - name: Install NDK & CMake
         run: sdkmanager "ndk;25.2.9519653" "cmake;3.22.1"
 
-      # STEP 3: Pure C++ standalone compilation
-      - name: Compile Library Independently
-        run: |
-          mkdir -p native/build
-          cd native/build
-          cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_HOME/ndk/25.2.9519653/build/cmake/android.toolchain.cmake \
-                -DANDROID_ABI=arm64-v8a \
-                -DANDROID_PLATFORM=android-21 \
-                ..
-          make -j$(nproc)
-          cp libnative-lib.so ../../DXs/
-          echo "✅ Isolated Native `.so` compiled successfully into DXs/"
-
-      # STEP 4: Base APK compilation
-      - name: Compile Pure Base APK
+      - name: Build Native Library & APK
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
-          cp app/build/outputs/apk/debug/app-debug.apk DXs/driderx-base.apk
-          echo "✅ Clean Base APK compiled and staged inside DXs/"
+          cp app/build/outputs/apk/debug/app-debug.apk DXs/driderx-ios.apk
 
-      - name: Clean Unused Workspace Bloat before Push
+      - name: Clean Workspace
         run: |
-          rm -rf native/build app/build .gradle build
+          rm -rf app/build .gradle build
 
-      # STEP 5: Secure Git Deploy payload mapping
-      - name: Deploy Isolated Binaries directly to DXs Folder
+      - name: Deploy APK to DXs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Deploy 1000% Crash-Proof iOS UI Layout & Java Matcher Engine [skip ci]" || echo "No changes"
+          git commit -m "Deploy iOS-style full-screen DriderX with GIF loading, animations, back nav [skip ci]" || echo "No changes"
           git push origin HEAD:${{ github.ref_name }}
