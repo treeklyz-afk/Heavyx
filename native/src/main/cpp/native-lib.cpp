@@ -27,7 +27,7 @@ Java_com_drix_MainActivity_findDriverNative(JNIEnv* env, jobject thiz, jstring p
     int eta = timeDist(gen);
     
     std::stringstream response;
-    response << "⚡ Driver Matched Successfully!\n\n"
+    response << "⚡ Driver Matched (Cloud Core Live)!\n\n"
              << "Driver: " << drivers[index] << "\n"
              << "Vehicle: " << vehicles[index] << "\n"
              << "Route: " << pickupLocation << " -> " << dropLocation << "\n"
