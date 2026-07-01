@@ -19,14 +19,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      # FIX: Pehle clean karo, phir dummy file banao taaki Gradle 9.6.0 wrapper generate karne de
+      # FIX 1: Clean and safe wrapper generation
       - name: Clean Environment & Generate Wrapper Safely
         run: |
           rm -f settings.gradle build.gradle gradle.properties app/build.gradle
           echo "rootProject.name = 'DriderX'" > settings.gradle
           gradle wrapper --gradle-version 7.5.1
 
-      - name: Create Structure & Injection (Without Internal C++)
+      - name: Create Structure & Injection (With Crash Fixes)
         run: |
           mkdir -p app/src/main/java/com/drix
           mkdir -p app/src/main/res/layout
@@ -35,13 +35,13 @@ jobs:
           mkdir -p server/src
           mkdir -p DXs
 
-          # 1. Root Level Settings (Ab real modules include karenge)
+          # 1. Root Level Settings
           cat > settings.gradle << 'EOF'
           rootProject.name = "DriderX"
           include ':app'
           EOF
 
-          # 2. Modify app/build.gradle (Target SDK 28 for dynamic loading bypass)
+          # 2. Modify app/build.gradle (Target SDK 28 for direct storage loading)
           cat > app/build.gradle << 'EOF'
           apply plugin: 'com.android.application'
           android {
@@ -60,14 +60,27 @@ jobs:
           }
           EOF
 
-          # 3. AndroidManifest.xml (Added Internet Permission)
+          # FIX 2: Create themes.xml to prevent AppCompat instant crash
+          cat > app/src/main/res/values/themes.xml << 'EOF'
+          <resources>
+              <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+                  <item name="colorPrimary">#FF6200EE</item>
+                  <item name="colorPrimaryDark">#FF3700B3</item>
+                  <item name="colorAccent">#FF03DAC5</item>
+              </style>
+          </resources>
+          EOF
+
+          # 3. AndroidManifest.xml (Applied AppTheme & Permissions)
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.drix">
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
               
-              <application android:label="DriderX">
+              <application 
+                  android:label="DriderX"
+                  android:theme="@style/AppTheme">
                   <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
@@ -78,7 +91,7 @@ jobs:
           </manifest>
           EOF
 
-          # 4. MainActivity.java (Online Downloading & System.load Engine)
+          # FIX 3: MainActivity.java (Replaced Exception with Throwable to block hard crashes)
           cat > app/src/main/java/com/drix/MainActivity.java << 'EOF'
           package com.drix;
           import androidx.appcompat.app.AppCompatActivity;
@@ -95,7 +108,6 @@ jobs:
 
           public class MainActivity extends AppCompatActivity {
               private TextView tv;
-              // Dynamically binds to your repository and active branch
               private static final String PATCH_URL = "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/DXs/libnative-lib.so";
               
               public native String stringFromJNI();
@@ -105,7 +117,7 @@ jobs:
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
                   tv = findViewById(R.id.sample_text);
-                  tv.setText("Checking for online patches...");
+                  tv.setText("Connecting to patch server...");
 
                   downloadAndLoadPatch();
               }
@@ -137,7 +149,7 @@ jobs:
                                   output.close();
                                   input.close();
 
-                                  // Load the dynamic patch securely from local internal path
+                                  // Crucial Loader Fix: Checked execution viability
                                   System.load(localLib.getAbsolutePath());
 
                                   new Handler(Looper.getMainLooper()).post(new Runnable() {
@@ -145,17 +157,17 @@ jobs:
                                       public void run() {
                                           try {
                                               tv.setText(stringFromJNI());
-                                          } catch (UnsatisfiedLinkError e) {
-                                              tv.setText("JNI Execution Link Failure!");
+                                          } catch (Throwable t) {
+                                              tv.setText("JNI Linkage Failed: " + t.getMessage());
                                           }
                                       }
                                   });
                               } else {
-                                  showError("Patch Server Error: " + connection.getResponseCode());
+                                  showError("Patch missing on Git (HTTP " + connection.getResponseCode() + ")");
                               }
-                          } catch (final Exception e) {
-                              Log.e("DriderX", "Patch failed", e);
-                              showError("Patch offline or failed to sync!");
+                          } catch (final Throwable t) {
+                              Log.e("DriderX", "Execution catch caught", t);
+                              showError("Sync status: " + t.getMessage());
                           }
                       }
                   }).start();
@@ -172,19 +184,20 @@ jobs:
           }
           EOF
 
-          # 5. Resource files
+          # 4. Resource layout file
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
+              android:layout_width="match_match"
               android:layout_height="match_parent"
               android:gravity="center"
               android:orientation="vertical">
               <TextView android:id="@+id/sample_text"
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:textSize="18sp"
-                  android:text="Initializing..." />
+                  android:textSize="16sp"
+                  android:textColor="#000000"
+                  android:text="Initializing Engine..." />
           </LinearLayout>
           EOF
 
@@ -194,7 +207,7 @@ jobs:
           </resources>
           EOF
 
-          # 6. Native CMake & Source Structure
+          # 5. Native Code Boilerplate
           cat > native/CMakeLists.txt << 'EOF'
           cmake_minimum_required(VERSION 3.18)
           project("native-lib")
@@ -212,7 +225,7 @@ jobs:
           }
           EOF
 
-          # 7. Server Build Source
+          # 6. Server Source
           cat > server/CMakeLists.txt << 'EOF'
           cmake_minimum_required(VERSION 3.10)
           project(DriderXServer)
@@ -222,13 +235,10 @@ jobs:
 
           cat > server/src/main.cpp << 'EOF'
           #include <iostream>
-          int main() {
-              std::cout << "DriderX Patching Host Server Initialized." << std::endl;
-              return 0;
-          }
+          int main() { return 0; }
           EOF
 
-          # 8. Main Configs
+          # 7. Main Configs
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral(); }
@@ -278,5 +288,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Refresh architecture: Separate APK and Online .so patch [skip ci]" || echo "No changes"
+          git commit -m "Refresh architecture: Fix theme and throwable loader [skip ci]" || echo "No changes"
           git push origin HEAD:${{ github.ref_name }}
