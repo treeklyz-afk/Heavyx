@@ -6,7 +6,7 @@ on:
     branches: [ main, master ]
     paths-ignore:
       - 'README.md'
-      - 'DXs/**'       # Infinite build loops se bachne ke liye
+      - 'DXs/**'       # Infinite loops se bachne ke liye
 
 jobs:
   patch-and-build:
@@ -19,16 +19,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Clean pre-existing workspace configs for safe initialization
+      # STEP 1: Pre-existing configuration clean karke safely wrapper generation
       - name: Clean Environment & Generate Wrapper Safely
         run: |
           rm -f settings.gradle build.gradle gradle.properties app/build.gradle
           echo "rootProject.name = 'DriderX'" > settings.gradle
           gradle wrapper --gradle-version 7.5.1
 
-      - name: Create Necessary Project Structure Only
+      # STEP 2: Naye iOS Style Driver Code Structure ki fresh injection
+      - name: Create Structure & Advanced Driver App Injection
         run: |
-          # Only creating required directories for App and Native Patch
           mkdir -p app/src/main/java/com/drix
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
@@ -60,18 +60,18 @@ jobs:
           }
           EOF
 
-          # 3. Themes Configuration (To prevent immediate launch crashes)
+          # 3. iOS Pure Dark Theme Configuration (Launch crash protection)
           cat > app/src/main/res/values/themes.xml << 'EOF'
           <resources>
               <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
-                  <item name="colorPrimary">#FF6200EE</item>
-                  <item name="colorPrimaryDark">#FF3700B3</item>
-                  <item name="colorAccent">#FF03DAC5</item>
+                  <item name="colorPrimary">#000000</item>
+                  <item name="colorPrimaryDark">#000000</item>
+                  <item name="colorAccent">#0A84FF</item>
               </style>
           </resources>
           EOF
 
-          # 4. Clean AndroidManifest.xml (Removed deprecated package attribute)
+          # 4. Clean AndroidManifest.xml (Applied AppTheme and Permissions)
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
@@ -90,13 +90,18 @@ jobs:
           </manifest>
           EOF
 
-          # 5. MainActivity.java (Runtime Dynamic Native Downloader Engine)
+          # 5. MainActivity.java (Runtime Telemetry Interface with Throwable Protection)
           cat > app/src/main/java/com/drix/MainActivity.java << 'EOF'
           package com.drix;
+
           import androidx.appcompat.app.AppCompatActivity;
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
+          import android.view.View;
+          import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.LinearLayout;
           import android.widget.TextView;
           import android.util.Log;
           import java.io.File;
@@ -106,19 +111,56 @@ jobs:
           import java.net.URL;
 
           public class MainActivity extends AppCompatActivity {
-              private TextView tv;
+              private TextView tvStatus;
+              private TextView tvDriverStatus;
+              private EditText etPickup, etDrop;
+              private Button btnFindDriver;
+              private LinearLayout resultLayout;
+              private boolean isPatchLoaded = false;
+
               private static final String PATCH_URL = "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/DXs/libnative-lib.so";
               
-              public native String stringFromJNI();
+              public native String findDriverNative(String pickup, String drop);
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
-                  tv = findViewById(R.id.sample_text);
-                  tv.setText("Connecting to patch server...");
 
+                  tvStatus = findViewById(R.id.sample_text);
+                  tvDriverStatus = findViewById(R.id.tv_driver_status);
+                  etPickup = findViewById(R.id.et_pickup);
+                  etDrop = findViewById(R.id.et_drop);
+                  btnFindDriver = findViewById(R.id.btn_find_driver);
+                  resultLayout = findViewById(R.id.result_layout);
+
+                  btnFindDriver.setEnabled(false);
                   downloadAndLoadPatch();
+
+                  btnFindDriver.setOnClickListener(new View.OnClickListener() {
+                      @Override
+                      public void onClick(View v) {
+                          String pickupTxt = etPickup.getText().toString().trim();
+                          String dropTxt = etDrop.getText().toString().trim();
+
+                          if (pickupTxt.isEmpty() || dropTxt.isEmpty()) {
+                              resultLayout.setVisibility(View.VISIBLE);
+                              tvDriverStatus.setText("Please enter valid locations.");
+                              return;
+                          }
+
+                          if (isPatchLoaded) {
+                              try {
+                                  String dynamicResult = findDriverNative(pickupTxt, dropTxt);
+                                  resultLayout.setVisibility(View.VISIBLE);
+                                  tvDriverStatus.setText(dynamicResult);
+                              } catch (Throwable t) {
+                                  resultLayout.setVisibility(View.VISIBLE);
+                                  tvDriverStatus.setText("Execution linkage error: " + t.getMessage());
+                              }
+                          }
+                      }
+                  });
               }
 
               private void downloadAndLoadPatch() {
@@ -127,7 +169,6 @@ jobs:
                       public void run() {
                           try {
                               File localLib = new File(getFilesDir(), "libnative-lib.so");
-                              
                               URL url = new URL(PATCH_URL);
                               HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                               connection.setConnectTimeout(15000);
@@ -137,67 +178,170 @@ jobs:
                               if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
                                   InputStream input = connection.getInputStream();
                                   FileOutputStream output = new FileOutputStream(localLib);
-
                                   byte[] buffer = new byte[4096];
                                   int bytesRead;
                                   while ((bytesRead = input.read(buffer)) != -1) {
                                       output.write(buffer, 0, bytesRead);
                                   }
-
                                   output.flush();
                                   output.close();
                                   input.close();
 
-                                  // Load the dynamic patch safely into internal data context
                                   System.load(localLib.getAbsolutePath());
+                                  isPatchLoaded = true;
 
                                   new Handler(Looper.getMainLooper()).post(new Runnable() {
                                       @Override
                                       public void run() {
-                                          try {
-                                              tv.setText(stringFromJNI());
-                                          } catch (Throwable t) {
-                                              tv.setText("JNI Linkage Failed: " + t.getMessage());
-                                          }
+                                          tvStatus.setText("Secure Patch Engine: Active & Online");
+                                          btnFindDriver.setEnabled(true);
                                       }
                                   });
                               } else {
-                                  showError("Patch missing on Git (HTTP " + connection.getResponseCode() + ")");
+                                  updateStatus("Server status offline (HTTP " + connection.getResponseCode() + ")");
                               }
                           } catch (final Throwable t) {
-                              Log.e("DriderX", "Execution catch caught", t);
-                              showError("Sync status: " + t.getMessage());
+                              Log.e("DriderX", "Patch mapping failure", t);
+                              updateStatus("Sync error: Verification patch missing.");
                           }
                       }
                   }).start();
               }
 
-              private void showError(final String msg) {
+              private void updateStatus(final String msg) {
                   new Handler(Looper.getMainLooper()).post(new Runnable() {
                       @Override
                       public void run() {
-                          tv.setText(msg);
+                          tvStatus.setText(msg);
                       }
                   });
               }
           }
           EOF
 
-          # 6. FIXED layout file (Changed match_match to match_parent)
+          # 6. FIXED iOS Pitch Black Layout (No layout typos or compile errors)
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+          <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
-              android:gravity="center"
-              android:orientation="vertical">
-              <TextView android:id="@+id/sample_text"
+              android:background="#000000"
+              android:padding="20dp">
+
+              <TextView
+                  android:id="@+id/header_title"
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:textSize="16sp"
-                  android:textColor="#000000"
-                  android:text="Initializing Engine..." />
-          </LinearLayout>
+                  android:layout_marginTop="24dp"
+                  android:text="DriderX Ride"
+                  android:textColor="#FFFFFF"
+                  android:textSize="28sp"
+                  android:textStyle="bold" />
+
+              <TextView
+                  android:id="@+id/sample_text"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_below="@id/header_title"
+                  android:layout_marginTop="8dp"
+                  android:text="Initializing secure core..."
+                  android:textColor="#8E8E93"
+                  android:textSize="14sp" />
+
+              <LinearLayout
+                  android:id="@+id/location_card"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_centerInParent="true"
+                  android:orientation="vertical">
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:background="#1C1C1E"
+                      android:orientation="vertical"
+                      android:padding="16dp">
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="PICKUP LOCATION"
+                          android:textColor="#0A84FF"
+                          android:textSize="11sp"
+                          android:textStyle="bold" />
+
+                      <EditText
+                          android:id="@+id/et_pickup"
+                          android:layout_width="match_parent"
+                          android:layout_height="44dp"
+                          android:background="@android:color/transparent"
+                          android:hint="Where from?"
+                          android:textColor="#FFFFFF"
+                          android:textColorHint="#48484A"
+                          android:textSize="16sp"
+                          android:importantForAutofill="no"
+                          android:inputType="textPostalAddress" />
+
+                      <View
+                          android:layout_width="match_parent"
+                          android:layout_height="0.5dp"
+                          android:layout_marginTop="12dp"
+                          android:layout_marginBottom="12dp"
+                          android:background="#38383A" />
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="DROP OFF LOCATION"
+                          android:textColor="#30D158"
+                          android:textSize="11sp"
+                          android:textStyle="bold" />
+
+                      <EditText
+                          android:id="@+id/et_drop"
+                          android:layout_width="match_parent"
+                          android:layout_height="44dp"
+                          android:background="@android:color/transparent"
+                          android:hint="Where to?"
+                          android:textColor="#FFFFFF"
+                          android:textColorHint="#48484A"
+                          android:textSize="16sp"
+                          android:importantForAutofill="no"
+                          android:inputType="textPostalAddress" />
+                  </LinearLayout>
+
+                  <Button
+                      android:id="@+id/btn_find_driver"
+                      android:layout_width="match_parent"
+                      android:layout_height="54dp"
+                      android:layout_marginTop="24dp"
+                      android:backgroundTint="#FFFFFF"
+                      android:text="Request DriderX"
+                      android:textColor="#000000"
+                      android:textSize="17sp"
+                      android:textStyle="bold"
+                      android:textAllCaps="false" />
+              </LinearLayout>
+
+              <LinearLayout
+                  android:id="@+id/result_layout"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_below="@id/location_card"
+                  android:layout_marginTop="20dp"
+                  android:background="#1C1C1E"
+                  android:orientation="vertical"
+                  android:padding="16dp"
+                  android:visibility="invisible">
+
+                  <TextView
+                      android:id="@+id/tv_driver_status"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:textColor="#FFFFFF"
+                      android:textSize="15sp" />
+              </LinearLayout>
+          </RelativeLayout>
           EOF
 
           cat > app/src/main/res/values/strings.xml << 'EOF'
@@ -206,10 +350,11 @@ jobs:
           </resources>
           EOF
 
-          # 7. Native CMake & Source Configs
+          # 7. Advanced Native C++ Driver Allocation Core Logic
           cat > native/CMakeLists.txt << 'EOF'
           cmake_minimum_required(VERSION 3.18)
           project("native-lib")
+          set(CMAKE_CXX_STANDARD 17)
           add_library(native-lib SHARED src/main/cpp/native-lib.cpp)
           find_library(log-lib log)
           target_link_libraries(native-lib ${log-lib})
@@ -218,13 +363,44 @@ jobs:
           cat > native/src/main/cpp/native-lib.cpp << 'EOF'
           #include <jni.h>
           #include <string>
+          #include <random>
+          #include <sstream>
+
           extern "C" JNIEXPORT jstring JNICALL
-          Java_com_drix_MainActivity_stringFromJNI(JNIEnv* env, jobject thiz) {
-              return env->NewStringUTF("Hello from DriderX Online Live Patch!");
+          Java_com_drix_MainActivity_findDriverNative(JNIEnv* env, jobject thiz, jstring pickup, jstring drop) {
+              
+              const char* pickupChars = env->GetStringUTFChars(pickup, nullptr);
+              const char* dropChars = env->GetStringUTFChars(drop, nullptr);
+              
+              std::string pickupLocation(pickupChars);
+              std::string dropLocation(dropChars);
+              
+              env->ReleaseStringUTFChars(pickup, pickupChars);
+              env->ReleaseStringUTFChars(drop, dropChars);
+              
+              std::string drivers[] = {"Vikram Singh [Rider Pro]", "Rajesh Kumar [Elite]", "Aman Verma [X-Prime]"};
+              std::string vehicles[] = {"(KA-03-HA-4321)", "(DL-01-CA-9876)", "(BR-01-PC-5543)"};
+              
+              std::random_device rd;
+              std::mt19937 gen(rd());
+              std::uniform_int_distribution<> dist(0, 2);
+              std::uniform_int_distribution<> timeDist(2, 7);
+              
+              int index = dist(gen);
+              int eta = timeDist(gen);
+              
+              std::stringstream response;
+              response << "⚡ Driver Matched Successfully!\n\n"
+                       << "Driver: " << drivers[index] << "\n"
+                       << "Vehicle: " << vehicles[index] << "\n"
+                       << "Route: " << pickupLocation << " -> " << dropLocation << "\n"
+                       << "Status: Arriving in " << eta << " mins";
+                       
+              return env->NewStringUTF(response.str().c_str());
           }
           EOF
 
-          # 8. Gradle Core Properties
+          # 8. Main Configuration Scripts
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral(); }
@@ -240,7 +416,7 @@ jobs:
 
           cat > README.md << 'EOF'
           # DriderX
-          Android Split Patch System. Base APK links dynamically to separate libnative-lib.so inside DXs.
+          Advanced iOS style Dark UI Ride App. APK links dynamically to separate libnative-lib.so inside DXs.
           EOF
 
       - name: Set up JDK 17
@@ -255,6 +431,7 @@ jobs:
       - name: Install NDK Components
         run: sdkmanager "ndk;25.2.9519653" "cmake;3.22.1"
 
+      # STEP 3: Pure C++ compilation directly into the target execution path
       - name: Compile Library Independently (Standalone Compilation)
         run: |
           mkdir -p native/build
@@ -267,6 +444,7 @@ jobs:
           cp libnative-lib.so ../../DXs/
           echo "✅ Isolated Native `.so` compiled successfully into DXs/"
 
+      # STEP 4: Base APK without hardcoded binary tracking modules
       - name: Compile Pure Base APK
         run: |
           chmod +x gradlew
@@ -276,13 +454,13 @@ jobs:
 
       - name: Clean Unused Workspace Bloat before Push
         run: |
-          # Keep only your core tracking folders and clean temporary build items
           rm -rf native/build app/build .gradle build
 
+      # STEP 5: Safe Git Deploy payload mapping targeting DXs folder context
       - name: Deploy Isolated Binaries directly to DXs Folder
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Deploy production ready isolated binaries to DXs [skip ci]" || echo "No changes"
+          git commit -m "Deploy Advanced iOS Theme System and Drivers matching logic to DXs [skip ci]" || echo "No changes"
           git push origin HEAD:${{ github.ref_name }}
